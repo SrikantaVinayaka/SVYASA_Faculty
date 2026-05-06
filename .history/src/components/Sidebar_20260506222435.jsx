@@ -60,10 +60,10 @@ const NAV = [
   {
     section: "Administrative",
     items: [
-      // {
-      //   id: "create", label: "Create", icon: Plus,
-      //   children: ["New Assignment", "New Quiz", "New Announcement"],
-      // },
+      {
+        id: "create", label: "Create", icon: Plus,
+        children: ["New Assignment", "New Quiz", "New Announcement"],
+      },
       {
         id: "events", label: "Events", icon: CalendarCheck,
         children: ["Document Event", "Add Event"],
