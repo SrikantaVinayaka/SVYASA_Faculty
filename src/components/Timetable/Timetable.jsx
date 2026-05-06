@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import ClassTimetable from "./ClassTimetable.jsx";
 import InternalAssessment from "./InternalAssessment.jsx";
@@ -8,6 +9,8 @@ const TABS = ["Class Timetable", "Internal Assessment", "Other Assessment", "Cla
 
 export default function Timetable({ tab, onTabChange }) {
   const activeTab = TABS.includes(tab) ? tab : "Class Timetable";
+  const showClassTransferTab = !["Internal Assessment", "Other Assessment"].includes(activeTab);
+  const visibleTabs = showClassTransferTab ? TABS : TABS.filter((t) => t !== "Class Transfer");
 
   const renderTabContent = () => {
     switch (activeTab) {
@@ -35,7 +38,7 @@ export default function Timetable({ tab, onTabChange }) {
           <p className="text-[12.5px] text-text2">Manage class schedules, assessments, and transfers.</p>
         </div>
         <div className="flex items-center p-1.5 bg-white border border-border rounded-full">
-          {TABS.map((t) => {
+          {visibleTabs.map((t) => {
             const isActive = t === activeTab;
             return (
               <button

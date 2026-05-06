@@ -1,3 +1,6 @@
+// next change, remove Higher Authority Verification from OD types and related logic, as it's not a valid OD type and causes confusion in the code. Adjust the default OD type to "Medical" or another valid type as needed.
+
+
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Upload, Download, Save, FileCheck, CalendarClock, AlertCircle } from "lucide-react";
 import * as XLSX from "xlsx";
@@ -12,7 +15,7 @@ const STATUS = {
   ABSENT: "A",
   ON_DUTY: "OD",
 };
-const OD_REQUEST_TYPES = ["Higher Authority Verification", "Medical", "Event / Competition", "Other"];
+const OD_REQUEST_TYPES = [/*"Higher Authority Verification",*/ "Medical", "Event / Competition", "Other"];
 
 const students = [
   { id: 1, usn: "2022508001", name: "Aarav Nair" },
@@ -413,7 +416,10 @@ export default function App() {
     return stats;
   }, [attendanceRecords]);
 
+
+  
   const selectedTimetable = useMemo(() => {
+    
     return (
       timetable.find(
         (entry) =>

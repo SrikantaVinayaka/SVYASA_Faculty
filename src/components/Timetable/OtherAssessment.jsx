@@ -16,9 +16,6 @@ export default function OtherAssessment() {
     title: "",
     section: "A",
     testType: "Quiz",
-    startDate: "",
-    endDate: "",
-    submissionDate: "",
     deadline: "",
     note: "",
   });
@@ -36,17 +33,14 @@ export default function OtherAssessment() {
       id: `oa-${Date.now()}`,
       title: form.title.trim(),
       type: `${selectedOtherType} / ${form.testType}`,
-      due: form.deadline || form.submissionDate || "--",
+      due: form.deadline || "--",
       section: form.section,
-      startDate: form.startDate,
-      endDate: form.endDate,
-      submissionDate: form.submissionDate,
       deadline: form.deadline,
       note: form.note,
     };
     setCreatedRows((prev) => [newRow, ...prev]);
     setShowCreate(false);
-    setForm({ title: "", section: "A", testType: "Quiz", startDate: "", endDate: "", submissionDate: "", deadline: "", note: "" });
+    setForm({ title: "", section: "A", testType: "Quiz", deadline: "", note: "" });
   }
 
   return (
@@ -83,10 +77,10 @@ export default function OtherAssessment() {
           <input placeholder="Title" value={form.title} onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))} className="rounded-lg border border-slate-300 px-3 py-2 text-sm" />
           <select value={form.testType} onChange={(e) => setForm((p) => ({ ...p, testType: e.target.value }))} className="rounded-lg border border-slate-300 px-3 py-2 text-sm">{TEST_TYPES.map((t) => <option key={t}>{t}</option>)}</select>
           <input placeholder="Section" value={form.section} onChange={(e) => setForm((p) => ({ ...p, section: e.target.value }))} className="rounded-lg border border-slate-300 px-3 py-2 text-sm" />
-          <input type="date" value={form.startDate} onChange={(e) => setForm((p) => ({ ...p, startDate: e.target.value }))} className="rounded-lg border border-slate-300 px-3 py-2 text-sm" />
-          <input type="date" value={form.endDate} onChange={(e) => setForm((p) => ({ ...p, endDate: e.target.value }))} className="rounded-lg border border-slate-300 px-3 py-2 text-sm" />
-          <input type="date" value={form.submissionDate} onChange={(e) => setForm((p) => ({ ...p, submissionDate: e.target.value }))} className="rounded-lg border border-slate-300 px-3 py-2 text-sm" />
-          <input type="date" value={form.deadline} onChange={(e) => setForm((p) => ({ ...p, deadline: e.target.value }))} className="rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+          <label className="text-xs font-medium text-slate-600">
+            Due Date
+            <input type="date" value={form.deadline} onChange={(e) => setForm((p) => ({ ...p, deadline: e.target.value }))} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+          </label>
           <input placeholder="Note" value={form.note} onChange={(e) => setForm((p) => ({ ...p, note: e.target.value }))} className="rounded-lg border border-slate-300 px-3 py-2 text-sm md:col-span-2" />
           <button onClick={handleCreateAssessment} className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white">Add</button>
         </div>

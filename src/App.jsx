@@ -3,8 +3,11 @@ import Topbar from "./components/Topbar.jsx";
 import Dashboard from "./components/Dashboard/Dashboard.jsx";
 import LessonPlan from "./components/LessonPlan/LessonPlan.jsx";
 import Attendance from "./components/Attendance/Attendance";
+import Assessment from "./components/Assessment/Assessment.jsx";
 import Timetable from "./components/Timetable/Timetable.jsx";
-import Events from "./components/Event_s/Events.jsx";
+// import Events from "./components/Event_s/Events.jsx";
+import Events from "./components/new_event/Events.jsx";
+import AddEventPage from "./components/new_event/AddEventPage.jsx";
 import MyProfile from "./components/MyProfile/MyProfile.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
 // import MentoringPage from "./pages/MentoringPage.jsx";
@@ -32,10 +35,19 @@ export default function App() {
     }
   });
 
-  // Update activeChild when navigating to events
+  // Update activeChild when navigating to events or assessment
   useEffect(() => {
-    if (activeId === "events" && activeChild === "Class Timetable") {
+    if (
+      activeId === "events" &&
+      !["Events", "Add Event"].includes(activeChild)
+    ) {
       setActiveChild("Events");
+    }
+    if (
+      activeId === "assessment" &&
+      !["IA Mean %", "Marks Scored", "Question Paper Status", "MCQ"].includes(activeChild)
+    ) {
+      setActiveChild("Marks Scored");
     }
   }, [activeId, activeChild]);
 
@@ -57,6 +69,7 @@ export default function App() {
   const breadcrumb = useMemo(() => {
     if (activeId === "lessonplan") return `Lesson Plan · ${activeChild}`;
     if (activeId === "attendance") return `Attendance · ${activeChild}`;
+    if (activeId === "assessment") return `Assessment · ${activeChild}`;
     if (activeId === "timetable") return `Timetable · ${activeChild}`;
     if (activeId === "events") return `Events · ${activeChild}`;
     if (activeId === "mentoring") return `Mentoring · ${activeChild}`;
@@ -115,10 +128,20 @@ export default function App() {
             />
           ) : activeId === "attendance" ? (
             <Attendance />
+          ) : activeId === "assessment" ? (
+            <Assessment tab={activeChild} onTabChange={setActiveChild} />
           ) : activeId === "timetable" ? (
             <Timetable tab={activeChild} onTabChange={setActiveChild} />
           ) : activeId === "events" ? (
-            <Events activeChild={activeChild} onActiveChildChange={setActiveChild} />
+            activeChild === "Add Event" ? (
+              <main className="flex-1 overflow-y-auto">
+                <AddEventPage />
+              </main>
+            ) : (
+              <main className="flex-1 overflow-y-auto p-6 pb-12">
+                <Events />
+              </main>
+            )
           ) : activeId === "mentoring" ? (
             <main className="flex-1 overflow-y-auto p-6 pb-12">
               <Mentoring />

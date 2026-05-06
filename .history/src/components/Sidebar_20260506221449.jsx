@@ -66,7 +66,7 @@ const NAV = [
       },
       {
         id: "events", label: "Events", icon: CalendarCheck,
-        children: ["Document Event", "Add Event"],
+        children: ["Events", "Add Event"],
       },
       // { id: "notices",   label: "Notice Board", icon: Megaphone     },
       // { id: "grievance", label: "Grievance",    icon: Warning },

@@ -25,12 +25,12 @@ const STATS = [
 const QUICK = [
   { id: "class-timetable", label: "Class Timetable", desc: "View today's schedule & upcoming classes", icon: Calendar, ac: "#1A7FBF", bg: "#E8F4FD", route: { id: "timetable", child: "Class Timetable" } },
   { id: "full-timetable", label: "Full Time Table", desc: "Open complete timetable management", icon: Calendar, ac: "#2563EB", bg: "#E8EEFF", route: { id: "timetable", child: "Class Timetable" } },
-  { id: "mark-attendance", label: "Mark Attendance", desc: "Record student attendance quickly", icon: ClipboardText, ac: "#2E7D32", bg: "#EDF7EE", route: { id: "attendance" } },
-  { id: "ia-mean", label: "IA Mean %", desc: "Check internal assessment averages", icon: ChartBar, ac: "#C47A1E", bg: "#FEF3E2", route: { id: "timetable", child: "Internal Assessment" } },
+  { id: "mark-attendance", label: "Mark Attendance", desc: "Record student attendance quickly", icon: ClipboardText, ac: "#2E7D32", bg: "#EDF7EE", route: { id: "attendance", child: "Student Attendance" } },
+  { id: "ia-mean", label: "IA Mean %", desc: "Check internal assessment averages", icon: ChartBar, ac: "#C47A1E", bg: "#FEF3E2", route: { id: "assessment", child: "IA Mean %" } },
   { id: "lesson-plan", label: "Lesson Plan", desc: "Create or review your weekly plans", icon: BookOpen, ac: "#7B3FAE", bg: "#F3EEFA", route: { id: "lessonplan", child: "Create Plan" } },
-  { id: "question-paper", label: "Question Paper", desc: "Track question paper submission status", icon: MagnifyingGlass, ac: "#C0273D", bg: "#FDE8EC", route: { id: "events", child: "Events" } },
+  { id: "question-paper", label: "Question Paper", desc: "Track question paper submission status", icon: MagnifyingGlass, ac: "#C0273D", bg: "#FDE8EC", route: { id: "assessment", child: "Question Paper Status" } },
   { id: "mentoring", label: "Mentoring", desc: "View and manage your assigned mentees", icon: Users, ac: "#1A7F6A", bg: "#E8F8F5", route: { id: "mentoring", child: "My Mentees" } },
-  { id: "reports", label: "Reports", desc: "Download attendance & performance reports", icon: FileText, ac: "#2953A8", bg: "#EAF0FB", route: { id: "attendance" } },
+  { id: "reports", label: "Reports", desc: "Download attendance & performance reports", icon: FileText, ac: "#2953A8", bg: "#EAF0FB", route: { id: "reports", child: "Attendance Report" } },
   { id: "customize", label: "Customise", desc: "Manage your dashboard quick access tiles", icon: SlidersHorizontal, ac: "#7B1D2E", bg: "#F9ECED", route: { id: "dashboard" } },
 ];
 

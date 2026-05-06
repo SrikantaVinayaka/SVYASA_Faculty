@@ -46,9 +46,7 @@ const NAV = [
       },
       {
         id: "assessment", label: "Assessment", icon: ChartBar,
-        children: ["IA Mean %", "Marks Scored", 
-          // "Question Paper Status", "MCQ"
-        ],
+        children: ["IA Mean %", "Marks Scored", "Question Paper Status", "MCQ"],
       },
       {
         id: "mentoring", label: "Mentoring", icon: Users,
@@ -66,7 +64,7 @@ const NAV = [
       },
       {
         id: "events", label: "Events", icon: CalendarCheck,
-        children: ["Document Event", "Add Event"],
+        children: ["Events", "Add Event"],
       },
       // { id: "notices",   label: "Notice Board", icon: Megaphone     },
       // { id: "grievance", label: "Grievance",    icon: Warning },
