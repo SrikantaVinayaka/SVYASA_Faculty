@@ -1,6 +1,7 @@
 import React from "react";
 import MarksScore from "./Marks_scored.jsx";
 import IA_Mean from "./IA_mean.jsx";
+import OtherAssessmentDashboard from "./Other_assessment.jsx";
 export default function Assessment({ tab, onTabChange }) {
   if (tab === "Marks Scored") {
     return <MarksScore />;
@@ -8,6 +9,10 @@ export default function Assessment({ tab, onTabChange }) {
 
   if (tab === "IA Mean %") {
     return <IA_Mean />;
+  }
+
+  if (tab === "Other Assessment") {
+    return <OtherAssessmentDashboard />;
   }
 
   // For other tabs, show under development

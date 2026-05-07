@@ -248,7 +248,7 @@ function MultiSelectCheckbox({ label, options, selected, onChange }) {
         <CaretDown size={13} className="text-text2" />
       </button>
       {open && (
-        <div className="absolute z-50 mt-1 w-full bg-white border border-border rounded-xl shadow-lg max-h-48 overflow-y-auto">
+        <div className="absolute z-50 bottom-full mb-1 w-full bg-white border border-border rounded-xl shadow-lg max-h-48 overflow-y-auto">
           {options.map((o) => (
             <label
               key={o}
@@ -500,7 +500,7 @@ function QuestionPaperPrintView({
   questionPaper,
   questions,
   onBack,
-  readOnly = false,
+  isPreview,
 }) {
   const course = assessment.course;
   const paperRef = useRef(null);
@@ -542,8 +542,64 @@ function QuestionPaperPrintView({
 
   const fileName = `IA-${assessment.assessmentNumber}_${course.courseCode}`;
 
-  // async function handleDownloadPDF() {
-  //   setDownloading("pdf");
+  async function handleDownloadPDF() {
+    setDownloading("pdf");
+    try {
+      await loadScript(
+        "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js",
+      );
+      await loadScript(
+        "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js",
+      );
+
+      const el = paperRef.current;
+      const canvas = await window.html2canvas(el, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+        logging: false,
+      });
+
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4",
+      });
+
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+      const margin = 8;
+      const contentW = pageW - margin * 2;
+      const imgH = (canvas.height * contentW) / canvas.width;
+
+      let yOffset = 0;
+      const pageContentH = pageH - margin * 2;
+
+      while (yOffset < imgH) {
+        if (yOffset > 0) pdf.addPage();
+        pdf.addImage(
+          canvas.toDataURL("image/jpeg", 0.95),
+          "JPEG",
+          margin,
+          margin - yOffset,
+          contentW,
+          imgH,
+        );
+        yOffset += pageContentH;
+      }
+
+      pdf.save(`${fileName}.pdf`);
+    } catch (err) {
+      console.error("PDF download failed:", err);
+      alert("PDF download failed. Please try again.");
+    } finally {
+      setDownloading(null);
+    }
+  }
+
+  // async function handleDownloadWord() {
+  //   setDownloading("word");
   //   try {
   //     await loadScript(
   //       "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js",
@@ -553,12 +609,23 @@ function QuestionPaperPrintView({
   //     );
 
   //     const el = paperRef.current;
+  //     const prevStyle = el.getAttribute("style") || "";
+  //     el.setAttribute(
+  //       "style",
+  //       "width:800px;max-width:none;box-shadow:none;border:none;",
+  //     );
+  //     await new Promise((r) => setTimeout(r, 400));
+
   //     const canvas = await window.html2canvas(el, {
   //       scale: 2,
   //       useCORS: true,
   //       backgroundColor: "#ffffff",
   //       logging: false,
+  //       scrollX: 0,
+  //       scrollY: -window.scrollY,
   //     });
+
+  //     el.setAttribute("style", prevStyle);
 
   //     const { jsPDF } = window.jspdf;
   //     const pdf = new jsPDF({
@@ -569,540 +636,69 @@ function QuestionPaperPrintView({
 
   //     const pageW = pdf.internal.pageSize.getWidth();
   //     const pageH = pdf.internal.pageSize.getHeight();
-  //     const margin = 8;
-  //     const contentW = pageW - margin * 2;
-  //     const imgH = (canvas.height * contentW) / canvas.width;
+  //     const imgH = (canvas.height * pageW) / canvas.width;
 
   //     let yOffset = 0;
-  //     const pageContentH = pageH - margin * 2;
-
   //     while (yOffset < imgH) {
   //       if (yOffset > 0) pdf.addPage();
   //       pdf.addImage(
   //         canvas.toDataURL("image/jpeg", 0.95),
   //         "JPEG",
-  //         margin,
-  //         margin - yOffset,
-  //         contentW,
+  //         0,
+  //         -yOffset,
+  //         pageW,
   //         imgH,
   //       );
-  //       yOffset += pageContentH;
+  //       yOffset += pageH;
   //     }
 
   //     pdf.save(`${fileName}.pdf`);
   //   } catch (err) {
-  //     console.error("PDF download failed:", err);
-  //     alert("PDF download failed. Please try again.");
+  //     console.error("Download failed:", err);
+  //     alert("Download failed. Please try again.");
   //   } finally {
   //     setDownloading(null);
   //   }
   // }
 
-  async function handleDownloadWord() {
-    setDownloading("word");
-    try {
-      await loadScript("https://unpkg.com/docx@8.5.0/build/index.js");
-
-      const {
-        Document,
-        Packer,
-        Paragraph,
-        TextRun,
-        Table,
-        TableRow,
-        TableCell,
-        AlignmentType,
-        BorderStyle,
-        WidthType,
-        ShadingType,
-        VerticalAlign,
-      } = window.docx;
-
-      const maroon = "8B1A2A";
-      const lightBlue = "E8F4FC";
-      const borderColor = "AAAAAA";
-      const noBorder = { style: BorderStyle.NONE, size: 0, color: "FFFFFF" };
-      const solidBorder = {
-        style: BorderStyle.SINGLE,
-        size: 4,
-        color: borderColor,
-      };
-      const cellBorders = {
-        top: solidBorder,
-        bottom: solidBorder,
-        left: solidBorder,
-        right: solidBorder,
-      };
-      const noBorders = {
-        top: noBorder,
-        bottom: noBorder,
-        left: noBorder,
-        right: noBorder,
-      };
-
-      const PAGE_W = 9026;
-
-      function cell(children, opts = {}) {
-        return new TableCell({
-          children,
-          borders: opts.borders ?? cellBorders,
-          width: opts.width
-            ? { size: opts.width, type: WidthType.DXA }
-            : undefined,
-          shading: opts.shading
-            ? { fill: opts.shading, type: ShadingType.CLEAR }
-            : undefined,
-          verticalAlign: opts.vAlign ?? VerticalAlign.CENTER,
-          margins: { top: 60, bottom: 60, left: 100, right: 100 },
-          columnSpan: opts.colSpan,
-        });
-      }
-
-      function para(text, opts = {}) {
-        return new Paragraph({
-          alignment: opts.align ?? AlignmentType.LEFT,
-          spacing: {
-            before: opts.spaceBefore ?? 0,
-            after: opts.spaceAfter ?? 0,
-          },
-          children: [
-            new TextRun({
-              text: String(text ?? ""),
-              bold: opts.bold ?? false,
-              size: opts.size ?? 20,
-              color: opts.color ?? "000000",
-              font: "Times New Roman",
-            }),
-          ],
-        });
-      }
-
-      const children = [];
-
-      // Header table
-      children.push(
-        new Table({
-          width: { size: PAGE_W, type: WidthType.DXA },
-          columnWidths: [1200, 6626, 1200],
-          borders: {
-            top: noBorder,
-            bottom: noBorder,
-            left: noBorder,
-            right: noBorder,
-            insideH: noBorder,
-            insideV: noBorder,
-          },
-          rows: [
-            new TableRow({
-              children: [
-                cell(
-                  [
-                    para("S-VYASA", {
-                      bold: true,
-                      align: AlignmentType.CENTER,
-                      color: maroon,
-                      size: 16,
-                    }),
-                  ],
-                  { borders: noBorders, width: 1200, shading: "FFFFFF" },
-                ),
-                cell(
-                  [
-                    para("S-VYASA DEEMED TO BE UNIVERSITY", {
-                      bold: true,
-                      align: AlignmentType.CENTER,
-                      size: 26,
-                    }),
-                    para("Bengaluru", {
-                      bold: true,
-                      align: AlignmentType.CENTER,
-                      size: 22,
-                    }),
-                    para(
-                      "School of Advanced Studies, Sattva Global City, Mysore Road, RV Vidyaniketan, Rajarajeshwari Nagar,",
-                      {
-                        align: AlignmentType.CENTER,
-                        size: 16,
-                        color: "555555",
-                      },
-                    ),
-                    para(course.degree, {
-                      bold: true,
-                      align: AlignmentType.CENTER,
-                      size: 22,
-                    }),
-                    para(`IA-${assessment.assessmentNumber}`, {
-                      bold: true,
-                      align: AlignmentType.CENTER,
-                      size: 24,
-                    }),
-                  ],
-                  { borders: noBorders, width: 6626 },
-                ),
-                cell(
-                  [
-                    para("USN :", {
-                      bold: true,
-                      align: AlignmentType.RIGHT,
-                      size: 20,
-                    }),
-                    new Table({
-                      width: { size: 1100, type: WidthType.DXA },
-                      columnWidths: [1100],
-                      rows: [
-                        new TableRow({
-                          children: [
-                            cell([para("")], {
-                              width: 1100,
-                              borders: cellBorders,
-                            }),
-                          ],
-                        }),
-                      ],
-                    }),
-                  ],
-                  { borders: noBorders, width: 1200 },
-                ),
-              ],
-            }),
-          ],
-        }),
-      );
-
-      children.push(
-        new Paragraph({
-          border: {
-            bottom: { style: BorderStyle.SINGLE, size: 6, color: borderColor },
-          },
-          spacing: { before: 120, after: 120 },
-          children: [],
-        }),
-      );
-
-      children.push(
-        new Table({
-          width: { size: PAGE_W, type: WidthType.DXA },
-          columnWidths: [5000, 4026],
-          borders: {
-            top: noBorder,
-            bottom: noBorder,
-            left: noBorder,
-            right: noBorder,
-            insideH: noBorder,
-            insideV: noBorder,
-          },
-          rows: [
-            new TableRow({
-              children: [
-                cell(
-                  [
-                    para(`Semester: 1-2025`, { size: 20 }),
-                    para(
-                      `Subject: ${course.courseName} (${course.courseCode})`,
-                      { size: 20 },
-                    ),
-                  ],
-                  { borders: noBorders, width: 5000 },
-                ),
-                cell(
-                  [
-                    para(`Date: ${assessment.dateLabel}`, {
-                      align: AlignmentType.RIGHT,
-                      size: 20,
-                    }),
-                    para(`Time: ${assessment.timeRange}`, {
-                      align: AlignmentType.RIGHT,
-                      size: 20,
-                    }),
-                    para(`Max Marks: ${assessment.maxMarks}`, {
-                      align: AlignmentType.RIGHT,
-                      size: 20,
-                    }),
-                  ],
-                  { borders: noBorders, width: 4026 },
-                ),
-              ],
-            }),
-          ],
-        }),
-      );
-
-      children.push(
-        new Paragraph({
-          border: {
-            bottom: { style: BorderStyle.SINGLE, size: 6, color: borderColor },
-          },
-          spacing: { before: 80, after: 200 },
-          children: [],
-        }),
-      );
-
-      // Parts
-      for (const part of partOrder) {
-        const rows = partMap[part] || [];
-        const colWidths = [500, 400, 5626, 700, 700, 1100];
-        const tableRows = [];
-
-        tableRows.push(
-          new TableRow({
-            children: [
-              cell(
-                [
-                  para(`PART ${part}`, {
-                    bold: true,
-                    align: AlignmentType.CENTER,
-                    size: 24,
-                    color: "1a56db",
-                  }),
-                ],
-                { borders: cellBorders, colSpan: 6, shading: "FFFFFF" },
-              ),
-            ],
-          }),
-        );
-
-        tableRows.push(
-          new TableRow({
-            children: [
-              cell(
-                [
-                  para("Answer All Questions", {
-                    align: AlignmentType.CENTER,
-                    size: 18,
-                    color: "1a56db",
-                  }),
-                ],
-                { borders: cellBorders, colSpan: 6, shading: "FFFFFF" },
-              ),
-            ],
-          }),
-        );
-
-        tableRows.push(
-          new TableRow({
-            children: [
-              cell([para("Q.No", { bold: true, size: 18 })], {
-                borders: cellBorders,
-                width: colWidths[0],
-              }),
-              cell([para("", { bold: true, size: 18 })], {
-                borders: cellBorders,
-                width: colWidths[1],
-              }),
-              cell([para("Question", { bold: true, size: 18 })], {
-                borders: cellBorders,
-                width: colWidths[2],
-              }),
-              cell(
-                [
-                  para("Marks", {
-                    bold: true,
-                    size: 18,
-                    align: AlignmentType.CENTER,
-                  }),
-                ],
-                { borders: cellBorders, width: colWidths[3] },
-              ),
-              cell(
-                [
-                  para("CO", {
-                    bold: true,
-                    size: 18,
-                    align: AlignmentType.CENTER,
-                  }),
-                ],
-                { borders: cellBorders, width: colWidths[4] },
-              ),
-              cell(
-                [
-                  para("BT/CL", {
-                    bold: true,
-                    size: 18,
-                    align: AlignmentType.CENTER,
-                  }),
-                ],
-                { borders: cellBorders, width: colWidths[5] },
-              ),
-            ],
-          }),
-        );
-
-        if (rows.length === 0) {
-          tableRows.push(
-            new TableRow({
-              children: [
-                cell(
-                  [
-                    para("No questions added for this part", {
-                      align: AlignmentType.CENTER,
-                      size: 18,
-                      color: "AAAAAA",
-                    }),
-                  ],
-                  { borders: cellBorders, colSpan: 6 },
-                ),
-              ],
-            }),
-          );
-        }
-
-        for (const row of rows) {
-          if (row.isOr) {
-            tableRows.push(
-              new TableRow({
-                children: [
-                  cell(
-                    [
-                      para("OR", {
-                        bold: true,
-                        align: AlignmentType.CENTER,
-                        size: 18,
-                        color: "666666",
-                      }),
-                    ],
-                    { borders: cellBorders, colSpan: 6, shading: "FFFFFF" },
-                  ),
-                ],
-              }),
-            );
-          }
-
-          const btcl = row.bloomsLevel
-            ? `L${BLOOMS.indexOf(row.bloomsLevel) + 1}`
-            : "";
-
-          tableRows.push(
-            new TableRow({
-              children: [
-                cell(
-                  [
-                    para(String(row.qNum ?? ""), {
-                      align: AlignmentType.CENTER,
-                      size: 20,
-                    }),
-                  ],
-                  { borders: cellBorders, width: colWidths[0] },
-                ),
-                cell(
-                  [
-                    para(row.subLabel ?? "", {
-                      bold: true,
-                      align: AlignmentType.CENTER,
-                      size: 20,
-                    }),
-                  ],
-                  { borders: cellBorders, width: colWidths[1] },
-                ),
-                cell([para(stripHtml(row.question), { size: 20 })], {
-                  borders: cellBorders,
-                  width: colWidths[2],
-                }),
-                cell(
-                  [
-                    para(String(row.totalMarks ?? ""), {
-                      align: AlignmentType.CENTER,
-                      size: 20,
-                    }),
-                  ],
-                  { borders: cellBorders, width: colWidths[3] },
-                ),
-                cell(
-                  [
-                    para((row.co || []).join(", "), {
-                      align: AlignmentType.CENTER,
-                      size: 20,
-                    }),
-                  ],
-                  { borders: cellBorders, width: colWidths[4] },
-                ),
-                cell([para(btcl, { align: AlignmentType.CENTER, size: 20 })], {
-                  borders: cellBorders,
-                  width: colWidths[5],
-                }),
-              ],
-            }),
-          );
-        }
-
-        children.push(
-          new Table({
-            width: { size: PAGE_W, type: WidthType.DXA },
-            columnWidths: colWidths,
-            rows: tableRows,
-          }),
-        );
-
-        children.push(
-          new Paragraph({ spacing: { before: 200, after: 0 }, children: [] }),
-        );
-      }
-
-      const doc = new Document({
-        sections: [
-          {
-            properties: {
-              page: {
-                size: { width: 11906, height: 16838 },
-                margin: { top: 720, right: 720, bottom: 720, left: 720 },
-              },
-            },
-            children,
-          },
-        ],
-      });
-
-      const buffer = await Packer.toBlob(doc);
-      const url = URL.createObjectURL(buffer);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${fileName}.docx`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error("Word download failed:", err);
-      alert("Word download failed. Please try again.");
-    } finally {
-      setDownloading(null);
-    }
-  }
-
   return (
     <div className="flex-1 overflow-y-auto bg-gray-100">
-      {!readOnly && (
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-white">
-          <div className="flex items-center gap-2 text-[12px] text-text2">
-            <span>Timetable</span>
-            <span>/</span>
-            <span className="text-text font-semibold">Internal Assessment</span>
-          </div>
-          <div className="flex items-center gap-2">
+      {/* Top nav bar */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-white">
+        <div className="flex items-center gap-2 text-[12px] text-text2">
+          <span>Timetable</span>
+          <span>/</span>
+          <span className="text-text font-semibold">Internal Assessment</span>
+        </div>
+        <div className="flex items-center gap-2">
+          {!isPreview && (
             <button
               onClick={handleDownloadPDF}
               disabled={!!downloading}
               className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-[12.5px] font-bold text-white transition
-              ${downloading === "pdf" ? "bg-red-300 cursor-wait" : "bg-red-600 hover:bg-red-700"}`}
+      ${downloading === "pdf" ? "bg-red-300 cursor-wait" : "bg-red-600 hover:bg-red-700"}`}
             >
               <Download size={14} />
               {downloading === "pdf" ? "Generating PDF…" : "Download PDF"}
             </button>
-            {/* <button
-              onClick={handleDownloadWord}
-              disabled={!!downloading}
-              className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-[12.5px] font-bold text-white transition
+          )}
+          {/* <button
+            onClick={handleDownloadWord}
+            disabled={!!downloading}
+            className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-[12.5px] font-bold text-white transition
               ${downloading === "word" ? "bg-blue-300 cursor-wait" : "bg-blue-600 hover:bg-blue-700"}`}
-            >
-              <Download size={14} />
-              {downloading === "word" ? "Generating Word…" : "Download Word"}
-            </button> */}
-            <button
-              onClick={onBack}
-              className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-[#9B2335] hover:underline ml-2"
-            >
-              <ArrowLeft size={14} /> Back
-            </button>
-          </div>
+          >
+            <Download size={14} />
+            {downloading === "word" ? "Generating Word…" : "Download Word"}
+          </button> */}
+          <button
+            onClick={onBack}
+            className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-[#9B2335] hover:underline ml-2"
+          >
+            <ArrowLeft size={14} /> Back
+          </button>
         </div>
-      )}
+      </div>
 
       {/* Paper body */}
       <div className="p-8">
@@ -1563,7 +1159,7 @@ function AddQuestionPage({
     setCo([]);
     setPo([]);
     setBloomsLevel("");
-    setUploadContent("No Content");
+    // setUploadContent("No Content");
     setTotalMarks("");
     setAnswerType("");
     setPart(parentQuestion?.part || "");
@@ -1581,7 +1177,7 @@ function AddQuestionPage({
       co,
       po,
       bloomsLevel,
-      uploadContent,
+      // uploadContent,
       totalMarks: Number(totalMarks),
       answerType,
       part,
@@ -1720,7 +1316,7 @@ function AddQuestionPage({
           </div>
         </div>
         {/* Upload Content */}
-        <div className="bg-white rounded-[14px] border border-border p-5">
+        {/* <div className="bg-white rounded-[14px] border border-border p-5">
           <FieldLabel>UPLOAD CONTENT</FieldLabel>
           <SelectDropdown
             value={uploadContent}
@@ -1733,7 +1329,7 @@ function AddQuestionPage({
             ]}
             placeholder="Select content type"
           />
-        </div>
+        </div> */}
         {/* Bottom fields */}
         <div className="bg-white rounded-[14px] border border-border p-5">
           <div className="grid grid-cols-3 gap-4">
@@ -1803,6 +1399,7 @@ function QuestionPaperDetailPage({
   onSubmit,
   onDeleteQP,
   onEditQPSettings,
+  onPreview,
   toast,
   setToast,
 }) {
@@ -1820,7 +1417,7 @@ function QuestionPaperDetailPage({
   const [deleteQPConfirm, setDeleteQPConfirm] = useState(false);
   const [editQPSettingsModal, setEditQPSettingsModal] = useState(false);
   const [pendingSubParentId, setPendingSubParentId] = useState(null);
-  const [previewModal, setPreviewModal] = useState(false);
+  const [reviewerFaculty, setReviewerFaculty] = useState([]);
 
   const actionsRef = useRef();
 
@@ -1834,18 +1431,43 @@ function QuestionPaperDetailPage({
   }, []);
 
   function handleSubmit() {
-    if (!schemeFile && !questionPaper.schemeFileName) {
+    const required = Number(questionPaper.totalQuestions) || 0;
+    const actual = questions.length;
+
+    if (required > 0 && actual < required) {
       setToast({
-        message: "Error: Scheme of Evaluation is mandatory",
+        message: `Please add all ${required} questions before submitting. Only ${actual} question(s) added so far.`,
         type: "error",
       });
       return;
     }
+
+    if (!schemeFile && !questionPaper.schemeFileName) {
+      setToast({
+        message: "Error: Scheme of Evaluation is mandatory before submitting.",
+        type: "error",
+      });
+      return;
+    }
+
     onSubmit(schemeFileName || questionPaper.schemeFileName);
   }
 
   function handleSubQuestionClick(parentId) {
     setPendingSubParentId(parentId);
+    setQuestionTypeModal(true);
+  }
+
+  function handleAddQuestionClick() {
+    const limit = Number(questionPaper.totalQuestions) || 0;
+    if (limit > 0 && questions.length >= limit) {
+      setToast({
+        message: `You've reached the limit of ${limit} question(s). Please update the limit in "Edit Paper Settings" under Actions to add more.`,
+        type: "error",
+      });
+      return;
+    }
+    setPendingSubParentId(null);
     setQuestionTypeModal(true);
   }
 
@@ -1905,7 +1527,7 @@ function QuestionPaperDetailPage({
           </div>
           <div className="flex items-center gap-2 relative">
             <BtnBlue
-              onClick={() => setQuestionTypeModal(true)}
+              onClick={handleAddQuestionClick}
               icon={<Question size={14} />}
             >
               Question
@@ -2059,10 +1681,7 @@ function QuestionPaperDetailPage({
                           {choiceWith}
                         </td>
                         <td className="px-3 py-3">
-                          <button
-                            onClick={() => setPreviewModal(true)}
-                            className="w-8 h-5 rounded bg-sky-400 flex items-center justify-center"
-                          >
+                          <button className="w-8 h-5 rounded bg-sky-400 flex items-center justify-center">
                             <Eye
                               size={11}
                               className="text-white"
@@ -2152,10 +1771,7 @@ function QuestionPaperDetailPage({
                               -
                             </td>
                             <td className="px-3 py-3">
-                              <button
-                                onClick={() => setPreviewModal(true)}
-                                className="w-8 h-5 rounded bg-sky-400 flex items-center justify-center"
-                              >
+                              <button className="w-8 h-5 rounded bg-sky-400 flex items-center justify-center">
                                 <Eye
                                   size={11}
                                   className="text-white"
@@ -2272,24 +1888,24 @@ function QuestionPaperDetailPage({
         {/* Faculty + bottom actions */}
         <div className="mt-4 flex items-center justify-between gap-4">
           <div className="w-64">
-            <SelectDropdown
-              value=""
-              onChange={() => {}}
+            <MultiSelectCheckbox
+              label="Select reviewer faculty"
               options={[
                 "Dr Y Mohamadi Begam",
                 "Dr Karthiyayini",
                 "Mr Hari Prasath",
               ]}
-              placeholder="Select reviewer faculty"
+              selected={reviewerFaculty}
+              onChange={setReviewerFaculty}
             />
           </div>
           <div className="flex items-center gap-2">
             <BtnSecondary onClick={onSave} icon={<FloppyDisk size={14} />}>
               Save
             </BtnSecondary>
-            <BtnBlue onClick={() => setPreviewModal(true)} icon={<Eye size={14} />}>
+            <BtnSecondary onClick={onPreview} icon={<Eye size={14} />}>
               Preview
-            </BtnBlue>
+            </BtnSecondary>
             <BtnBlue onClick={handleSubmit} icon={<CheckCircle size={14} />}>
               Submit
             </BtnBlue>
@@ -2355,27 +1971,6 @@ function QuestionPaperDetailPage({
           >
             OK
           </BtnPrimary>
-        </div>
-      </Modal>
-
-      <Modal
-        open={previewModal}
-        onClose={() => setPreviewModal(false)}
-        title="Question Paper Preview"
-        maxWidth="max-w-7xl"
-      >
-        <div className="max-h-[80vh] overflow-y-auto">
-          <QuestionPaperPrintView
-            assessment={assessment}
-            questionPaper={questionPaper}
-            questions={questions}
-            readOnly
-          />
-        </div>
-        <div className="flex items-center justify-end px-6 pb-5">
-          <BtnSecondary onClick={() => setPreviewModal(false)} icon={<X size={13} />}>
-            Close
-          </BtnSecondary>
         </div>
       </Modal>
 
@@ -2937,6 +2532,7 @@ export default function InternalAssessment() {
   const [qpTypeModal, setQpTypeModal] = useState(false);
   const [deleteIAId, setDeleteIAId] = useState(null);
   const [toast, setToast] = useState(null);
+  const [isPreviewing, setIsPreviewing] = useState(false);
 
   useEffect(() => {
     lsSet(LS_ASSESSMENTS, assessments);
@@ -3241,7 +2837,8 @@ export default function InternalAssessment() {
         assessment={activeAssessment}
         questionPaper={activeQP}
         questions={activeQuestions}
-        onBack={() => navigate("list")}
+        onBack={() => navigate(isPreviewing ? "questionPaperDetail" : "list")}
+        isPreview={isPreviewing}
       />
     );
   }
@@ -3286,6 +2883,10 @@ export default function InternalAssessment() {
         onSubmit={handleSubmitQP}
         onDeleteQP={handleDeleteQP}
         onEditQPSettings={handleEditQPSettings}
+        onPreview={() => {
+          setIsPreviewing(true);
+          navigate("printView");
+        }}
         toast={toast}
         setToast={setToast}
       />
@@ -3420,6 +3021,7 @@ export default function InternalAssessment() {
                         {a.questionPaperStatus === "completed" ? (
                           <button
                             onClick={() => {
+                              setIsPreviewing(false);
                               setActiveAssessmentId(a.id);
                               navigate("printView", a.id);
                             }}

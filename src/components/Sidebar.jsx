@@ -46,9 +46,7 @@ const NAV = [
       },
       {
         id: "assessment", label: "Assessment", icon: ChartBar,
-        children: ["IA Mean %", "Marks Scored", 
-          // "Question Paper Status", "MCQ"
-        ],
+        children: ["IA Mean %", "Marks Scored", "Other Assessment"],
       },
       {
         id: "mentoring", label: "Mentoring", icon: Users,

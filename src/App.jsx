@@ -7,6 +7,8 @@ import Assessment from "./components/Assessment/Assessment.jsx";
 import Timetable from "./components/Timetable/Timetable.jsx";
 // import Events from "./components/Event_s/Events.jsx";
 import Events from "./components/new_event/Events.jsx";
+import CreateEventPage from "./components/new_event/CreateEventPage.jsx";
+
 import AddEventPage from "./components/new_event/AddEventPage.jsx";
 import MyProfile from "./components/MyProfile/MyProfile.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
@@ -45,7 +47,7 @@ export default function App() {
     }
     if (
       activeId === "assessment" &&
-      !["IA Mean %", "Marks Scored", "Question Paper Status", "MCQ"].includes(activeChild)
+      !["IA Mean %", "Marks Scored", "Other Assessment", "Question Paper Status", "MCQ"].includes(activeChild)
     ) {
       setActiveChild("Marks Scored");
     }

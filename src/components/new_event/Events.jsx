@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, Download, Calendar, Users, MapPin, BookOpen, Clock } from 'lucide-react';
 import { Document, Packer, Paragraph, TextRun, HeadingLevel } from 'docx';
-import { buildDocx } from './AddEventPage.jsx';
+import AddEventPage, { buildDocx } from './AddEventPage.jsx';
 
 const DB_KEY = 'event_reports_db';
 
@@ -133,32 +133,94 @@ const mapEventToDocForm = (event) => {
 };
 
 // ── Reusable Modal wrapper ────────────────────────────────────────────────────
-function Modal({ onClose, children, wide = false }) {
-  // Lock background scroll
+function Modal({ onClose, children, wide = false, ariaLabel = "Dialog" }) {
+  const dialogRef = useRef(null);
+  const closeBtnRef = useRef(null);
+  const lastActiveElementRef = useRef(null);
+
+  // Lock background scroll + restore when closed.
   useEffect(() => {
+    lastActiveElementRef.current = document.activeElement;
+    const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = ''; };
+
+    const t = window.setTimeout(() => closeBtnRef.current?.focus?.(), 0);
+
+    return () => {
+      window.clearTimeout(t);
+      document.body.style.overflow = previousOverflow;
+      lastActiveElementRef.current?.focus?.();
+    };
   }, []);
+
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+        return;
+      }
+
+      if (e.key !== 'Tab') return;
+      const root = dialogRef.current;
+      if (!root) return;
+
+      const focusable = Array.from(
+        root.querySelectorAll(
+          'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])'
+        )
+      ).filter((el) => el.offsetParent !== null);
+
+      if (!focusable.length) return;
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement;
+
+      if (e.shiftKey) {
+        if (active === first) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else if (active === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [onClose]);
 
   return (
     <div
       className="fixed inset-0 z-100 flex items-center justify-center p-4"
       style={{ backgroundColor: 'rgba(0,0,0,0.55)' }}
-      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
       <div
-        className={`relative bg-white rounded-2xl shadow-2xl flex flex-col ${wide ? 'w-full max-w-3xl' : 'w-full max-w-xl'}`}
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={ariaLabel}
+        tabIndex={-1}
+        className={`relative bg-white rounded-2xl shadow-2xl flex flex-col ${
+          wide ? 'w-full max-w-3xl' : 'w-full max-w-xl'
+        }`}
         style={{ maxHeight: '90vh' }}
         onMouseDown={(e) => e.stopPropagation()}
       >
-        {/* Scrollable content area */}
         <div className="overflow-y-auto flex-1 rounded-2xl">
           {children}
         </div>
-        {/* Close button */}
+
         <button
+          ref={closeBtnRef}
           onClick={onClose}
           className="absolute top-3 right-3 p-1.5 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors z-10"
+          aria-label="Close modal"
         >
           <X size={16} className="text-gray-600" />
         </button>
@@ -269,6 +331,20 @@ function EventDetailModal({ event, onClose }) {
   );
 }
 
+// ── Add Event Modal ─────────────────────────────────────────────────────────
+function AddEventModal({ onClose, onSaved }) {
+  return (
+    <Modal onClose={onClose} wide ariaLabel="Add Event">
+      <AddEventPage
+        onSaved={() => {
+          onSaved?.();
+          onClose();
+        }}
+      />
+    </Modal>
+  );
+}
+
 // ── Event Card ────────────────────────────────────────────────────────────────
 function EventCard({ event, onClick, onDelete }) {
   return (
@@ -335,6 +411,7 @@ export default function Events() {
   const [date, setDate]       = useState('');
   const [dateView, setDateView] = useState('All');
   const [selectedEvent, setSelectedEvent] = useState(null);
+  const [showAddModal, setShowAddModal] = useState(false);
 
   useEffect(() => {
     setEvents(loadEvents());
@@ -443,14 +520,27 @@ export default function Events() {
           <p className="text-xs text-gray-400 mb-0.5">Events</p>
           <h1 className="text-2xl font-bold text-gray-900">Events</h1>
         </div>
-        <button
-          onClick={downloadAllEventsReport}
-          disabled={!filtered.length}
-          className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 hover:text-gray-900 transition-colors disabled:text-gray-400 disabled:cursor-not-allowed"
-        >
-          <Download size={16} />
-          Download All Events Report
-        </button>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setShowAddModal(true)}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white rounded-lg transition-colors"
+              style={{ backgroundColor: '#7B1C2A' }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#5e1520')}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#7B1C2A')}
+            >
+              <span className="text-lg" aria-hidden="true">+</span>
+              <span>Create Event</span>
+            </button>
+            <button
+              onClick={downloadAllEventsReport}
+              disabled={!filtered.length}
+              className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 hover:text-gray-900 transition-colors disabled:text-gray-400 disabled:cursor-not-allowed"
+            >
+              <Download size={16} />
+              Download All Events Report
+            </button>
+          </div>
       </div>
 
       {/* ── Filter card ── */}
@@ -580,6 +670,12 @@ export default function Events() {
       {/* ── Modals ── */}
       {selectedEvent && (
         <EventDetailModal event={selectedEvent} onClose={() => setSelectedEvent(null)} />
+      )}
+      {showAddModal && (
+        <AddEventModal
+          onClose={() => setShowAddModal(false)}
+          onSaved={() => setEvents(loadEvents())}
+        />
       )}
     </div>
   );

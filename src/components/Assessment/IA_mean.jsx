@@ -1,421 +1,398 @@
 import React, { useMemo, useState } from "react";
 
+const IA_ASSESSMENTS_KEY = "svyasa_ia_assessments";
+const IA_QUESTIONS_KEY = "svyasa_ia_questions";
+
+const STUDENTS = [
+  { sl: 1, usn: "2222408001", name: "Aakash B" },
+  { sl: 2, usn: "2222408002", name: "Abhishek R" },
+  { sl: 3, usn: "2222408004", name: "ABIN H. DANIEL" },
+  { sl: 4, usn: "2222408010", name: "Bhumireddy Veera Bhavitha" },
+  { sl: 5, usn: "2222408011", name: "Bhavya S" },
+];
+
+function safeLSRead(key, fallback) {
+  if (typeof window === "undefined") return fallback;
+  try {
+    const raw = window.localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function getQuestionHeaders(questionCount) {
+  const count = Math.max(1, questionCount || 0);
+  return Array.from({ length: count }, (_, i) => `Q${i + 1}`);
+}
+
 export default function IA_Mean() {
-  const [semester, setSemester] = useState("Semester 2");
-  const [section, setSection] = useState("A");
-  const [activeTab, setActiveTab] = useState("IA 1");
+  const [view, setView] = useState("dashboard");
+  const [selectedCourse, setSelectedCourse] = useState("");
+  const [selectedSemester, setSelectedSemester] = useState("Semester 4-2024");
+  const [selectedSubject, setSelectedSubject] = useState("");
+  const [selectedSection, setSelectedSection] = useState("");
+  const [selectedIa, setSelectedIa] = useState("");
 
-  const subjects = [
-    {
-      code: "MCA201",
-      subject: "Machine Learning",
-      students: 58,
-      average: 42,
-      highest: 49,
-      lowest: 24,
-      maxMarks: 50,
-      passedStudents: 52,
-    },
-    {
-      code: "MCA202",
-      subject: "Computer Architecture",
-      students: 60,
-      average: 31,
-      highest: 46,
-      lowest: 18,
-      maxMarks: 50,
-      passedStudents: 40,
-    },
-    {
-      code: "MCA203",
-      subject: "DBMS",
-      students: 57,
-      average: 22,
-      highest: 39,
-      lowest: 12,
-      maxMarks: 50,
-      passedStudents: 28,
-    },
-    {
-      code: "MCA204",
-      subject: "Research Methodology",
-      students: 61,
-      average: 44,
-      highest: 50,
-      lowest: 29,
-      maxMarks: 50,
-      passedStudents: 58,
-    },
-    {
-      code: "MCA205",
-      subject: "Java Programming Lab",
-      students: 59,
-      average: 39,
-      highest: 48,
-      lowest: 21,
-      maxMarks: 50,
-      passedStudents: 50,
-    },
-  ];
+  const [editingStudentUsn, setEditingStudentUsn] = useState(null);
+  const [draftMarks, setDraftMarks] = useState({});
+  const [savedMarks, setSavedMarks] = useState({});
 
-  const processedSubjects = subjects.map((item) => {
-    const meanPercentage = Math.round(
-      (item.average / item.maxMarks) * 100
-    );
-
-    const passPercentage = Math.round(
-      (item.passedStudents / item.students) * 100
-    );
-
-    let grade = "C";
-
-    if (meanPercentage >= 85) {
-      grade = "O";
-    } else if (meanPercentage >= 75) {
-      grade = "A";
-    } else if (meanPercentage >= 60) {
-      grade = "B";
-    }
-
-    return {
-      ...item,
-      meanPercentage,
-      passPercentage,
-      grade,
-    };
-  });
-
-  const overallMean = Math.round(
-    processedSubjects.reduce(
-      (acc, item) => acc + item.meanPercentage,
-      0
-    ) / processedSubjects.length
+  const assessments = useMemo(
+    () => safeLSRead(IA_ASSESSMENTS_KEY, []),
+    [],
+  );
+  const questionsByAssessment = useMemo(
+    () => safeLSRead(IA_QUESTIONS_KEY, {}),
+    [],
   );
 
-  const highestMean = Math.max(
-    ...processedSubjects.map((item) => item.meanPercentage)
-  );
-
-  const lowestMean = Math.min(
-    ...processedSubjects.map((item) => item.meanPercentage)
-  );
-
-  const below50Count = processedSubjects.filter(
-    (item) => item.meanPercentage < 50
-  ).length;
-
-  const highestSubject = useMemo(() => {
-    return processedSubjects.reduce((prev, current) =>
-      prev.meanPercentage > current.meanPercentage
-        ? prev
-        : current
+  const iaOptions = useMemo(() => {
+    const values = Array.from(
+      new Set(assessments.map((item) => `IA-${item.assessmentNumber}`)),
     );
-  }, []);
+    return values.sort();
+  }, [assessments]);
 
-  const lowestSubject = useMemo(() => {
-    return processedSubjects.reduce((prev, current) =>
-      prev.meanPercentage < current.meanPercentage
-        ? prev
-        : current
+  const courseOptions = useMemo(() => {
+    const values = Array.from(
+      new Set(assessments.map((item) => item.course?.label).filter(Boolean)),
     );
-  }, []);
+    return values;
+  }, [assessments]);
 
-  const getProgressColor = (value) => {
-    if (value >= 75) return "bg-green-500";
-    if (value >= 50) return "bg-yellow-500";
-    return "bg-red-500";
-  };
+  const subjectOptions = useMemo(() => {
+    const values = Array.from(
+      new Set(assessments.map((item) => item.course?.courseName).filter(Boolean)),
+    );
+    return values;
+  }, [assessments]);
 
-  const getGradeStyle = (grade) => {
-    switch (grade) {
-      case "O":
-        return "bg-green-100 text-green-700";
-      case "A":
-        return "bg-blue-100 text-blue-700";
-      case "B":
-        return "bg-yellow-100 text-yellow-700";
-      default:
-        return "bg-red-100 text-red-700";
-    }
-  };
+  const sectionOptions = useMemo(() => {
+    const values = Array.from(
+      new Set(
+        assessments
+          .map((item) => item.course?.label?.split("-").pop())
+          .filter(Boolean),
+      ),
+    );
+    return values;
+  }, [assessments]);
+
+  const filteredAssessments = useMemo(() => {
+    return assessments.filter((item) => {
+      const iaName = `IA-${item.assessmentNumber}`;
+      const section = item.course?.label?.split("-").pop() || "";
+      const passCourse = !selectedCourse || item.course?.label === selectedCourse;
+      const passSubject =
+        !selectedSubject || item.course?.courseName === selectedSubject;
+      const passSection = !selectedSection || section === selectedSection;
+      const passIa = !selectedIa || selectedIa === iaName;
+      return passCourse && passSubject && passSection && passIa;
+    });
+  }, [assessments, selectedCourse, selectedSubject, selectedSection, selectedIa]);
+
+  const activeAssessment = filteredAssessments[0] || null;
+  const activeQuestions = activeAssessment
+    ? questionsByAssessment[activeAssessment.id] || []
+    : [];
+  const questionHeaders = getQuestionHeaders(activeQuestions.length);
+
+  const studentRows = useMemo(() => {
+    return STUDENTS.map((student, index) => {
+      const questionMarks = questionHeaders.reduce((acc, question, qIdx) => {
+        const key = `${student.usn}-${question}`;
+        const defaultValue = (index + qIdx) % 3 === 0 ? "Ab" : ((index + qIdx + 2) % 3) + 1;
+        acc[question] = savedMarks[key] ?? defaultValue;
+        return acc;
+      }, {});
+
+      const total = Object.values(questionMarks).reduce((sum, value) => {
+        const n = Number(value);
+        return Number.isFinite(n) ? sum + n : sum;
+      }, 0);
+      const btcl = total > 0 ? "Apply" : "No Level";
+      return { ...student, questionMarks, total, btcl };
+    });
+  }, [questionHeaders, savedMarks]);
+
+  const passPercentage = studentRows.length
+    ? Math.round((studentRows.filter((s) => s.total > 0).length / studentRows.length) * 100)
+    : 0;
+
+  function handleEdit(student) {
+    const next = {};
+    questionHeaders.forEach((header) => {
+      const key = `${student.usn}-${header}`;
+      next[header] = String(student.questionMarks[header] ?? "");
+    });
+    setDraftMarks(next);
+    setEditingStudentUsn(student.usn);
+  }
+
+  function handleSave(student) {
+    const next = { ...savedMarks };
+    questionHeaders.forEach((header) => {
+      next[`${student.usn}-${header}`] = draftMarks[header] || "0";
+    });
+    setSavedMarks(next);
+    setEditingStudentUsn(null);
+    setDraftMarks({});
+  }
 
   return (
-    <main className="flex-1 overflow-y-auto bg-[#f5f7fb] p-6 pb-20">
-      {/* HEADER */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-800">
-          IA Mean Percentage
-        </h1>
-
-        <p className="text-gray-500 mt-2">
-          View average internal assessment performance across all
-          subjects
-        </p>
-      </div>
-
-      {/* FILTERS */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-8">
-        <div className="flex flex-col lg:flex-row lg:items-center gap-5">
-          {/* Semester */}
-          <div>
-            <label className="block text-sm text-gray-500 mb-2">
-              Semester
-            </label>
-
-            <select
-              value={semester}
-              onChange={(e) => setSemester(e.target.value)}
-              className="border border-gray-200 rounded-xl px-4 py-3 w-52 outline-none focus:ring-2 focus:ring-red-400"
-            >
-              <option>Semester 1</option>
-              <option>Semester 2</option>
-              <option>Semester 3</option>
-              <option>Semester 4</option>
-            </select>
-          </div>
-
-          {/* Section */}
-          <div>
-            <label className="block text-sm text-gray-500 mb-2">
-              Section
-            </label>
-
-            <select
-              value={section}
-              onChange={(e) => setSection(e.target.value)}
-              className="border border-gray-200 rounded-xl px-4 py-3 w-52 outline-none focus:ring-2 focus:ring-red-400"
-            >
-              <option>A</option>
-              <option>B</option>
-              <option>C</option>
-            </select>
-          </div>
-        </div>
-
-        {/* TABS */}
-        <div className="flex flex-wrap gap-3 mt-6">
-          {[
-            "IA 1",
-            "IA 2",
-            "IA 3",
-            "Assignment",
-            "Lab Internal",
-          ].map((tab) => (
+    <main className="flex-1 overflow-y-auto p-6 pb-12">
+      {view === "dashboard" ? (
+        <>
+          <div className="flex items-center justify-between gap-3 flex-wrap mb-5">
+            <div>
+              <h1 className="text-[18px] font-bold text-text">IA Mean %</h1>
+              <p className="text-[12.5px] text-text2 mt-1">
+                Internal assessment score dashboard and IA wise tabulation.
+              </p>
+            </div>
             <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-5 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
-                activeTab === tab
-                  ? "bg-[#991b1b] text-white shadow-md"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
+              onClick={() => setView("tabulate")}
+              className="px-4 py-2 rounded-lg bg-[#9B2335] text-white text-[12.5px] font-semibold"
             >
-              {tab}
+              Tabulate
             </button>
-          ))}
-        </div>
-      </div>
+          </div>
 
-      {/* STATS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-5 mb-8">
-        <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-          <p className="text-sm text-gray-500">
-            Overall IA Mean %
-          </p>
-
-          <h2 className="text-xl font-bold text-[#991b1b] mt-2">
-            {overallMean}%
-          </h2>
-        </div>
-
-        <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-          <p className="text-sm text-gray-500">
-            Highest IA Mean %
-          </p>
-
-          <h2 className="text-xl font-bold text-green-600 mt-2">
-            {highestMean}%
-          </h2>
-        </div>
-
-        <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-          <p className="text-sm text-gray-500">
-            Lowest IA Mean %
-          </p>
-
-          <h2 className="text-xl font-bold text-red-500 mt-2">
-            {lowestMean}%
-          </h2>
-        </div>
-
-        <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-          <p className="text-sm text-gray-500">
-            Subjects Below 50%
-          </p>
-
-          <h2 className="text-xl font-bold text-yellow-600 mt-2">
-            {below50Count}
-          </h2>
-        </div>
-
-        <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-          <p className="text-sm text-gray-500">
-            Total Subjects
-          </p>
-
-          <h2 className="text-xl font-bold text-blue-600 mt-2">
-            {processedSubjects.length}
-          </h2>
-        </div>
-      </div>
-
-      {/* TABLE */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-275">
-            <thead className="bg-gray-100">
-              <tr>
-                <th className="text-left px-4 py-3 text-sm text-gray-700">
-                  Subject Code
-                </th>
-
-                <th className="text-left px-4 py-3 text-sm text-gray-700">
-                  Subject Name
-                </th>
-
-                <th className="text-left px-4 py-3 text-sm text-gray-700">
-                  Students Appeared
-                </th>
-
-                <th className="text-left px-4 py-3 text-sm text-gray-700">
-                  Average Score
-                </th>
-
-                <th className="text-left px-4 py-3 text-sm text-gray-700">
-                  Highest Score
-                </th>
-
-                <th className="text-left px-4 py-3 text-sm text-gray-700">
-                  Lowest Score
-                </th>
-
-                <th className="text-left px-4 py-3 text-sm text-gray-700">
-                  Pass %
-                </th>
-
-                <th className="text-left px-4 py-3 text-sm text-gray-700">
-                  IA Mean %
-                </th>
-
-                <th className="text-left px-4 py-3 text-sm text-gray-700">
-                  Grade
-                </th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {processedSubjects.map((item, index) => (
-                <tr
-                  key={index}
-                  className="border-b border-gray-100 hover:bg-gray-50 transition"
+          <div className="rounded-xl border border-border bg-white p-4 mb-5">
+            <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-3">
+              <select
+                value={selectedCourse}
+                onChange={(e) => setSelectedCourse(e.target.value)}
+                className="border border-border rounded-lg px-3 py-2 text-[12px] bg-white"
+              >
+                <option value="">Course Handled</option>
+                {courseOptions.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={selectedSemester}
+                onChange={(e) => setSelectedSemester(e.target.value)}
+                className="border border-border rounded-lg px-3 py-2 text-[12px] bg-white"
+              >
+                <option>Semester 4-2024</option>
+                <option>Semester 3-2024</option>
+                <option>Semester 2-2024</option>
+              </select>
+              <select
+                value={selectedSubject}
+                onChange={(e) => setSelectedSubject(e.target.value)}
+                className="border border-border rounded-lg px-3 py-2 text-[12px] bg-white"
+              >
+                <option value="">Subject</option>
+                {subjectOptions.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={selectedSection}
+                onChange={(e) => setSelectedSection(e.target.value)}
+                className="border border-border rounded-lg px-3 py-2 text-[12px] bg-white"
+              >
+                <option value="">CS / Section</option>
+                {sectionOptions.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
+              {iaOptions.length > 0 ? (
+                <select
+                  value={selectedIa}
+                  onChange={(e) => setSelectedIa(e.target.value)}
+                  className="border border-border rounded-lg px-3 py-2 text-[12px] bg-white"
                 >
-                  <td className="px-4 py-3 text-sm font-medium text-gray-700">
-                    {item.code}
-                  </td>
+                  <option value="">IA-1 / IA-2</option>
+                  {iaOptions.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
+                  ))}
+                </select>
+              ) : null}
+            </div>
+          </div>
 
-                  <td className="px-4 py-3 text-sm">
-                    {item.subject}
-                  </td>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5">
+            <div className="rounded-xl border border-border bg-white p-4">
+              <p className="text-[12px] text-text2">Pass %</p>
+              <p className="text-[24px] font-bold text-text mt-1">{passPercentage}</p>
+              <p className="text-[12px] text-text2">Pass %</p>
+            </div>
+            <div className="rounded-xl border border-border bg-white p-4">
+              <p className="text-[12px] text-text2">Topper Score</p>
+              <p className="text-[24px] font-bold text-text mt-1">
+                {studentRows.length ? Math.max(...studentRows.map((s) => s.total)) : 0}
+              </p>
+            </div>
+            <div className="rounded-xl border border-border bg-white p-4">
+              <p className="text-[12px] text-text2">Mean Score*</p>
+              <p className="text-[24px] font-bold text-text mt-1">
+                {studentRows.length
+                  ? Math.round(
+                      studentRows.reduce((sum, row) => sum + row.total, 0) / studentRows.length,
+                    )
+                  : 0}
+              </p>
+              <p className="text-[12px] text-[#9B2335] font-semibold mt-1">Apply Bloom's Level</p>
+            </div>
+          </div>
 
-                  <td className="px-4 py-3 text-sm">
-                    {item.students}
-                  </td>
-
-                  <td className="px-4 py-3 text-sm">
-                    {item.average}/{item.maxMarks}
-                  </td>
-
-                  <td className="px-4 py-3 text-sm text-green-600 font-semibold">
-                    {item.highest}
-                  </td>
-
-                  <td className="px-4 py-3 text-sm text-red-500 font-semibold">
-                    {item.lowest}
-                  </td>
-
-                  <td className="px-4 py-3 text-sm">
-                    {item.passPercentage}%
-                  </td>
-
-                  {/* PROGRESS */}
-                  <td className="px-4 py-3 text-sm">
-                    <div className="flex items-center gap-3">
-                      <div className="w-24 h-3 bg-gray-200 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full ${getProgressColor(
-                            item.meanPercentage
-                          )}`}
-                          style={{
-                            width: `${item.meanPercentage}%`,
-                          }}
-                        ></div>
-                      </div>
-
-                      <span className="font-medium text-xs">
-                        {item.meanPercentage}%
-                      </span>
-                    </div>
-                  </td>
-
-                  <td className="px-4 py-3 text-sm">
-                    <span
-                      className={`px-3 py-1 rounded-full text-xs font-semibold ${getGradeStyle(
-                        item.grade
-                      )}`}
-                    >
-                      {item.grade}
-                    </span>
+          <div className="rounded-xl border border-border bg-white p-4 overflow-x-auto">
+            <h3 className="text-[13px] font-semibold text-text mb-3">Internal Assessment Scores</h3>
+            <table className="w-full min-w-160">
+              <thead>
+                <tr className="bg-[#e7f0fb] text-[12px] text-text2">
+                  <th className="text-left px-3 py-2 font-semibold">RESULT</th>
+                  <th className="text-left px-3 py-2 font-semibold">% of Students</th>
+                  <th className="text-left px-3 py-2 font-semibold">
+                    # of Students ({studentRows.length})
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="border-b border-border text-[12px]">
+                  <td className="px-3 py-2">&gt; 0</td>
+                  <td className="px-3 py-2">{passPercentage}</td>
+                  <td className="px-3 py-2">
+                    {studentRows.filter((row) => row.total > 0).length}
                   </td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                <tr className="border-b border-border text-[12px]">
+                  <td className="px-3 py-2">0</td>
+                  <td className="px-3 py-2">{100 - passPercentage}</td>
+                  <td className="px-3 py-2">
+                    {studentRows.filter((row) => row.total === 0).length}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="flex items-center justify-between gap-3 flex-wrap mb-5">
+            <div>
+              <h1 className="text-[18px] font-bold text-text">IA Mean % - Tabulate</h1>
+              <p className="text-[12.5px] text-text2 mt-1">
+                Student tiles and question table from Internal Assessment.
+              </p>
+            </div>
+            <button
+              onClick={() => setView("dashboard")}
+              className="px-4 py-2 rounded-lg border border-border text-[12.5px] font-semibold text-text"
+            >
+              Back
+            </button>
+          </div>
 
-      {/* INSIGHTS */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-8">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <h3 className="text-base font-semibold text-gray-800 mb-2">
-            Faculty Insight
-          </h3>
+          <div className="rounded-xl border border-border bg-white p-4 mb-4">
+            <p className="text-[12px] text-text2">
+              # of records : {studentRows.length}
+            </p>
+            <p className="text-[12px] text-text2 mt-1">
+              # of Mandatory Questions : {questionHeaders.length}
+            </p>
+            <p className="text-[12px] text-[#9B2335] font-semibold mt-2">Status : SUBMITTED</p>
+          </div>
 
-          <p className="text-sm text-gray-600">
-            <span className="font-semibold text-green-600">
-              {highestSubject.subject}
-            </span>{" "}
-            has the highest IA mean with{" "}
-            <span className="font-bold">
-              {highestSubject.meanPercentage}%
-            </span>
-            .
-          </p>
-        </div>
+          <div className="rounded-xl border border-border bg-white overflow-x-auto">
+            <table className="w-full min-w-230">
+              <thead>
+                <tr className="bg-[#cfe1f4] text-[12px] text-text2">
+                  <th className="text-left px-3 py-3 font-semibold">Sl #</th>
+                  <th className="text-left px-3 py-3 font-semibold">USN</th>
+                  <th className="text-left px-3 py-3 font-semibold">Name</th>
+                  {questionHeaders.map((header) => (
+                    <th key={header} className="text-left px-2 py-3 font-semibold">
+                      {header}
+                    </th>
+                  ))}
+                  <th className="text-left px-3 py-3 font-semibold">Total Score</th>
+                  <th className="text-left px-3 py-3 font-semibold">BT/CL</th>
+                  <th className="text-left px-3 py-3 font-semibold">Edit</th>
+                </tr>
+              </thead>
+              <tbody>
+                {studentRows.map((student) => {
+                  const isEditing = editingStudentUsn === student.usn;
+                  return (
+                    <tr key={student.usn} className="border-b border-border text-[12px]">
+                      <td className="px-3 py-3">{student.sl}</td>
+                      <td className="px-3 py-3">{student.usn}</td>
+                      <td className="px-3 py-3">{student.name}</td>
+                      {questionHeaders.map((header) => (
+                        <td key={header} className="px-2 py-3">
+                          {isEditing ? (
+                            <input
+                              value={draftMarks[header] ?? ""}
+                              onChange={(e) =>
+                                setDraftMarks((prev) => ({
+                                  ...prev,
+                                  [header]: e.target.value.replace(/[^\d]/g, "").slice(0, 2),
+                                }))
+                              }
+                              className="w-12 border border-border rounded px-2 py-1"
+                            />
+                          ) : (
+                            student.questionMarks[header]
+                          )}
+                        </td>
+                      ))}
+                      <td className="px-3 py-3 font-semibold">{student.total}</td>
+                      <td className="px-3 py-3">{student.btcl}</td>
+                      <td className="px-3 py-3">
+                        {isEditing ? (
+                          <button
+                            onClick={() => handleSave(student)}
+                            className="text-[#9B2335] font-semibold hover:underline"
+                          >
+                            Save
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleEdit(student)}
+                            className="text-[#9B2335] font-semibold hover:underline"
+                          >
+                            Edit
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
 
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <h3 className="text-base font-semibold text-gray-800 mb-2">
-            Improvement Needed
-          </h3>
-
-          <p className="text-sm text-gray-600">
-            <span className="font-semibold text-red-500">
-              {lowestSubject.subject}
-            </span>{" "}
-            has the lowest IA performance and may require additional
-            mentoring support.
-          </p>
-        </div>
-      </div>
+          <div className="rounded-xl border border-border bg-white p-4 mt-4">
+            <p className="text-[12px] text-text2 font-semibold mb-2">
+              IA Question Source (from Timetable Internal Assessment):
+            </p>
+            <div className="text-[12px] text-text2">
+              {activeAssessment ? (
+                <>
+                  <p>Assessment: IA-{activeAssessment.assessmentNumber}</p>
+                  <p>Course: {activeAssessment.course?.courseName || "-"}</p>
+                  <p>Questions available: {activeQuestions.length}</p>
+                </>
+              ) : (
+                <p>No Internal Assessment found. Create one in Timetable &gt; Internal Assessment.</p>
+              )}
+            </div>
+          </div>
+        </>
+      )}
     </main>
   );
 }

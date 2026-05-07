@@ -947,7 +947,7 @@ export default function AddEventPage() {
         <div className="stack">
           <div className="page-header">
             <p style={{ fontSize:12, color:"#9ca3af", marginBottom:4 }}>Events / <span style={{ color:"var(--maroon)" }}>Add Event</span></p>
-            <h1>Create Event</h1>
+            <h1>Add Event</h1>
           </div>
 
           <Card id="dept" icon="🏛" title="Department Details">
