@@ -9,9 +9,12 @@ const TABS = ["Class Timetable", "Internal Assessment", "Other Assessment", "Cla
 
 export default function Timetable({ tab, onTabChange }) {
   const activeTab = TABS.includes(tab) ? tab : "Class Timetable";
-  const showClassTransferTab = !["Internal Assessment", "Other Assessment"].includes(activeTab);
-  const visibleTabs = showClassTransferTab ? TABS : TABS.filter((t) => t !== "Class Transfer");
-
+ const visibleTabs = activeTab === "Class Transfer"
+  ? TABS.filter((t) => !["Internal Assessment", "Other Assessment"].includes(t))
+  : activeTab === "Internal Assessment" || activeTab === "Other Assessment"
+  ? TABS.filter((t) => t !== "Class Transfer")
+  : TABS;
+  
   const renderTabContent = () => {
     switch (activeTab) {
       case "Class Timetable":

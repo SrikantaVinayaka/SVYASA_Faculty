@@ -40,6 +40,15 @@ const MOCK_STUDENTS = [
       },
     ],
     uploads: [],
+    absenceReasons: [
+      { id: "ar1", type: "Medical", comment: "Fever — doctor certificate submitted", date: "2026-03-10", status: "Pending", source: "Student Portal" },
+    ],
+    achievements: [
+      { id: "ach1", title: "NSS Volunteering Award", category: "Events", date: "2026-02-20", details: "Community outreach camp", fileName: "nss-cert.pdf", source: "Student Portal" },
+    ],
+    certifications: [
+      { id: "cert1", title: "Python for Data Science", provider: "LinkedIn Learning", date: "2025-11-15", details: "LinkedIn certificate", fileName: "python-li.pdf", source: "Student Portal" },
+    ],
   },
   {
     id: "stu-2",
@@ -65,6 +74,15 @@ const MOCK_STUDENTS = [
     activities: ["Hackathon - College level"],
     tasks: [],
     uploads: [],
+    absenceReasons: [
+      { id: "ar1", type: "Medical", comment: "Fever — doctor certificate submitted", date: "2026-03-10", status: "Pending", source: "Student Portal" },
+    ],
+    achievements: [
+      { id: "ach1", title: "NSS Volunteering Award", category: "Events", date: "2026-02-20", details: "Community outreach camp", fileName: "nss-cert.pdf", source: "Student Portal" },
+    ],
+    certifications: [
+      { id: "cert1", title: "Python for Data Science", provider: "LinkedIn Learning", date: "2025-11-15", details: "LinkedIn certificate", fileName: "python-li.pdf", source: "Student Portal" },
+    ],
   },
   {
     id: "stu-3",
@@ -90,6 +108,15 @@ const MOCK_STUDENTS = [
     activities: ["Sports - Badminton"],
     tasks: [],
     uploads: [],
+    absenceReasons: [
+      { id: "ar1", type: "Medical", comment: "Fever — doctor certificate submitted", date: "2026-03-10", status: "Pending", source: "Student Portal" },
+    ],
+    achievements: [
+      { id: "ach1", title: "NSS Volunteering Award", category: "Events", date: "2026-02-20", details: "Community outreach camp", fileName: "nss-cert.pdf", source: "Student Portal" },
+    ],
+    certifications: [
+      { id: "cert1", title: "Python for Data Science", provider: "LinkedIn Learning", date: "2025-11-15", details: "LinkedIn certificate", fileName: "python-li.pdf", source: "Student Portal" },
+    ],
   },
 ];
 

@@ -2,6 +2,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import html2pdf from "html2pdf.js";
 import TaskModal from "./TaskModal.jsx";
 
+const OD_REQUEST_TYPES = ["Medical", "Event / Competition", "Other"];
+const ACHIEVEMENT_CATEGORIES = ["Sports", "Events", "Participation", "Personal Achievements", "Other"];
+
 function initials(name) {
   return name
     .split(" ")
@@ -55,8 +58,34 @@ export default function StudentProfileModal({
   onClose,
   onUpdateStudent,
 }) {
-  const [mode, setMode] = useState(readOnly ? "smr" : initialMode); // smr | edit | assignTask
+  const [mode, setMode] = useState(readOnly ? "smr" : initialMode); // smr | edit | assignTask | achievements
   const [taskModalOpen, setTaskModalOpen] = useState(false);
+  const [achievementModalOpen, setAchievementModalOpen] = useState(false);
+  const [certModalOpen, setCertModalOpen] = useState(false);
+  const [editingReasonId, setEditingReasonId] = useState(null);
+  const [reasonForm, setReasonForm] = useState({ type: "Medical", comment: "", date: "" });
+  const [achievementForm, setAchievementForm] = useState({ title: "", category: "Sports", date: "", details: "", fileName: "" });
+  const [certForm, setCertForm] = useState({ title: "", provider: "LinkedIn", date: "", details: "", fileName: "" });
+
+  const [phone, setPhone] = useState(student.profile?.phone ?? "");
+  const [email, setEmail] = useState(student.profile?.email ?? "");
+  const [dob, setDob] = useState(student.profile?.dob ?? "");
+  const [address, setAddress] = useState(student.profile?.address ?? "");
+  const [parentName, setParentName] = useState(student.profile?.parentName ?? "");
+  const [parentPhone, setParentPhone] = useState(student.profile?.parentPhone ?? "");
+  const [bloodGroup, setBloodGroup] = useState(student.profile?.bloodGroup ?? "");
+  const [category, setCategory] = useState(student.profile?.category ?? "");
+
+  useEffect(() => {
+    setPhone(student.profile?.phone ?? "");
+    setEmail(student.profile?.email ?? "");
+    setDob(student.profile?.dob ?? "");
+    setAddress(student.profile?.address ?? "");
+    setParentName(student.profile?.parentName ?? "");
+    setParentPhone(student.profile?.parentPhone ?? "");
+    setBloodGroup(student.profile?.bloodGroup ?? "");
+    setCategory(student.profile?.category ?? "");
+  }, [student]);
 
   useEffect(() => {
     setMode(readOnly ? "smr" : initialMode);
@@ -79,6 +108,8 @@ export default function StudentProfileModal({
 
   const hallTicketRef = useRef(null);
   const remarksRef = useRef(null);
+  const achievementsReportRef = useRef(null);
+  const semesterReportRef = useRef(null);
 
   const lowAttendance = attendancePct < 75;
 
@@ -111,6 +142,110 @@ export default function StudentProfileModal({
         .filter(Boolean),
     }));
     alert("Saved (mock).");
+  }
+
+  async function downloadPdfFromRef(ref, filename) {
+    if (!ref.current) return;
+    const opt = {
+      margin: 10,
+      filename,
+      image: { type: "jpeg", quality: 0.98 },
+      html2canvas: { scale: 2 },
+      jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+    };
+    await html2pdf().from(ref.current).set(opt).save();
+  }
+
+  function saveProfileDetails() {
+    onUpdateStudent?.((prev) => ({
+      ...prev,
+      profile: {
+        ...(prev.profile ?? {}),
+        phone,
+        email,
+        dob,
+        address,
+        parentName,
+        parentPhone,
+        bloodGroup,
+        category,
+      },
+    }));
+    alert("Profile details saved (mock).");
+  }
+
+  function saveReason() {
+    const comment = reasonForm.comment.trim();
+    if (!comment) return;
+    onUpdateStudent?.((prev) => {
+      const list = [...(prev.absenceReasons ?? [])];
+      if (editingReasonId) {
+        const idx = list.findIndex((r) => r.id === editingReasonId);
+        if (idx >= 0) list[idx] = { ...list[idx], ...reasonForm, comment };
+      } else {
+        list.push({
+          id: `ar-${Date.now()}`,
+          ...reasonForm,
+          comment,
+          status: "Pending",
+          source: "Mentor",
+        });
+      }
+      return { ...prev, absenceReasons: list };
+    });
+    setReasonForm({ type: "Medical", comment: "", date: new Date().toISOString().slice(0, 10) });
+    setEditingReasonId(null);
+  }
+
+  function updateReasonStatus(reasonId, status) {
+    onUpdateStudent?.((prev) => ({
+      ...prev,
+      absenceReasons: (prev.absenceReasons ?? []).map((r) => (r.id === reasonId ? { ...r, status } : r)),
+    }));
+  }
+
+  function addAchievement() {
+    if (!achievementForm.title.trim()) return;
+    onUpdateStudent?.((prev) => ({
+      ...prev,
+      achievements: [...(prev.achievements ?? []), { id: `ach-${Date.now()}`, ...achievementForm, source: "Mentor" }],
+    }));
+    setAchievementForm({ title: "", category: "Sports", date: "", details: "", fileName: "" });
+    setAchievementModalOpen(false);
+  }
+
+  function addCertification() {
+    if (!certForm.title.trim()) return;
+    onUpdateStudent?.((prev) => ({
+      ...prev,
+      certifications: [...(prev.certifications ?? []), { id: `cert-${Date.now()}`, ...certForm, source: "Mentor" }],
+    }));
+    setCertForm({ title: "", provider: "LinkedIn", date: "", details: "", fileName: "" });
+    setCertModalOpen(false);
+  }
+
+  function handleAchievementFile(file) {
+    if (!file) return;
+    const base = file.name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " ");
+    setAchievementForm((prev) => ({
+      ...prev,
+      title: prev.title || base,
+      date: prev.date || new Date().toISOString().slice(0, 10),
+      details: prev.details || `Certificate uploaded: ${file.name}`,
+      fileName: file.name,
+    }));
+  }
+
+  function handleCertFile(file) {
+    if (!file) return;
+    const base = file.name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " ");
+    setCertForm((prev) => ({
+      ...prev,
+      title: prev.title || base,
+      date: prev.date || new Date().toISOString().slice(0, 10),
+      details: prev.details || `LinkedIn certificate: ${file.name}`,
+      fileName: file.name,
+    }));
   }
 
   async function downloadRemarksPdf() {
@@ -192,6 +327,15 @@ export default function StudentProfileModal({
             )}
             <button
               type="button"
+              onClick={() => setMode("achievements")}
+              className={`rounded-lg px-3 py-2 text-[12.5px] font-semibold ${
+                mode === "achievements" ? "bg-[#7B1D2E] text-white" : "border border-border bg-white text-text hover:bg-page-bg"
+              }`}
+            >
+              Achievements
+            </button>
+            <button
+              type="button"
               onClick={onClose}
               className="rounded-lg border border-border bg-white px-3 py-2 text-[12.5px] font-semibold text-text hover:bg-page-bg"
             >
@@ -227,19 +371,41 @@ export default function StudentProfileModal({
                   </div>
                   <div className="flex justify-between gap-3">
                     <span className="text-text2">Phone</span>
-                    <span className="font-semibold">{student.profile?.phone}</span>
+                    <input value={phone} onChange={(e) => setPhone(e.target.value)} className="rounded-lg border border-border px-2 py-1 text-[13px] font-semibold text-text outline-none w-44" />
                   </div>
                   <div className="flex justify-between gap-3">
                     <span className="text-text2">Email</span>
-                    <span className="font-semibold">{student.profile?.email}</span>
+                    <input value={email} onChange={(e) => setEmail(e.target.value)} className="rounded-lg border border-border px-2 py-1 text-[13px] font-semibold text-text outline-none w-44" />
                   </div>
                   <div className="flex justify-between gap-3">
                     <span className="text-text2">DOB</span>
-                    <span className="font-semibold">{student.profile?.dob}</span>
+                    <input value={dob} onChange={(e) => setDob(e.target.value)} className="rounded-lg border border-border px-2 py-1 text-[13px] font-semibold text-text outline-none w-44" />
                   </div>
-                  <div className="pt-2 text-[12px] text-text2">
-                    Address: <span className="text-text">{student.profile?.address}</span>
+                  <div className="pt-2">
+                    <label className="text-[12px] font-semibold text-text2">Address</label>
+                    <textarea value={address} onChange={(e) => setAddress(e.target.value)} rows={2} className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-[13px] text-text outline-none" />
                   </div>
+                  <div className="grid gap-2 sm:grid-cols-2 pt-2">
+                    <label className="text-[12px] font-semibold text-text2">
+                      Parent name
+                      <input value={parentName} onChange={(e) => setParentName(e.target.value)} className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-[13px] outline-none" />
+                    </label>
+                    <label className="text-[12px] font-semibold text-text2">
+                      Parent phone
+                      <input value={parentPhone} onChange={(e) => setParentPhone(e.target.value)} className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-[13px] outline-none" />
+                    </label>
+                    <label className="text-[12px] font-semibold text-text2">
+                      Blood group
+                      <input value={bloodGroup} onChange={(e) => setBloodGroup(e.target.value)} className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-[13px] outline-none" />
+                    </label>
+                    <label className="text-[12px] font-semibold text-text2">
+                      Category
+                      <input value={category} onChange={(e) => setCategory(e.target.value)} className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-[13px] outline-none" />
+                    </label>
+                  </div>
+                  <button type="button" onClick={saveProfileDetails} className="mt-2 rounded-lg bg-[#7B1D2E] px-3 py-2 text-[12px] font-semibold text-white">
+                    Save Profile Details
+                  </button>
                 </div>
               </Section>
 
@@ -282,6 +448,45 @@ export default function StudentProfileModal({
                 </div>
               </Section>
             </div>
+          ) : null}
+
+          {mode === "smr" ? (
+            <Section title="Leave / OD Reasons">
+              <div className="space-y-3">
+                <div className="grid gap-2 sm:grid-cols-3">
+                  <select value={reasonForm.type} onChange={(e) => setReasonForm((p) => ({ ...p, type: e.target.value }))} className="rounded-lg border border-border px-3 py-2 text-[13px]">
+                    {OD_REQUEST_TYPES.map((t) => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                  <input type="date" value={reasonForm.date} onChange={(e) => setReasonForm((p) => ({ ...p, date: e.target.value }))} className="rounded-lg border border-border px-3 py-2 text-[13px]" />
+                  <button type="button" onClick={saveReason} className="rounded-lg bg-[#7B1D2E] px-3 py-2 text-[12.5px] font-semibold text-white">
+                    {editingReasonId ? "Update Reason" : "Add Reason"}
+                  </button>
+                </div>
+                <textarea value={reasonForm.comment} onChange={(e) => setReasonForm((p) => ({ ...p, comment: e.target.value }))} rows={2} placeholder="Reason details..." className="w-full rounded-lg border border-border px-3 py-2 text-[13px] outline-none" />
+                <div className="space-y-2">
+                  {(student.absenceReasons ?? []).length === 0 ? (
+                    <div className="text-[12.5px] text-text2">No leave/OD reasons recorded.</div>
+                  ) : (
+                    student.absenceReasons.map((r) => (
+                      <div key={r.id} className="rounded-lg border border-border bg-page-bg p-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="text-[12.5px] font-bold text-text">{r.type} · {r.date}</div>
+                          <Pill tone={r.status === "Approved" ? "green" : r.status === "Rejected" ? "red" : "amber"}>{r.status}</Pill>
+                        </div>
+                        <div className="mt-1 text-[12.5px] text-text">{r.comment}</div>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <button type="button" onClick={() => updateReasonStatus(r.id, "Approved")} className="rounded-md border border-[#B7E0BA] bg-[#EDF7EE] px-2 py-1 text-[11px] font-semibold text-[#2E7D32]">Approve</button>
+                          <button type="button" onClick={() => updateReasonStatus(r.id, "Rejected")} className="rounded-md border border-[#E5B3B9] bg-[#FFF4F5] px-2 py-1 text-[11px] font-semibold text-[#9B2335]">Reject</button>
+                          <button type="button" onClick={() => { setEditingReasonId(r.id); setReasonForm({ type: r.type, comment: r.comment, date: r.date }); }} className="rounded-md border border-border px-2 py-1 text-[11px] font-semibold text-text">Edit</button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </Section>
           ) : null}
 
           {mode === "edit" ? (
@@ -617,8 +822,148 @@ export default function StudentProfileModal({
               </div>
             </div>
           ) : null}
+
+          {mode === "achievements" ? (
+            <div className="space-y-3">
+              <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={() => setAchievementModalOpen(true)} className="rounded-lg bg-[#7B1D2E] px-3 py-2 text-[12.5px] font-semibold text-white">+ Add New Achievement</button>
+                <button type="button" onClick={() => setCertModalOpen(true)} className="rounded-lg border border-border bg-white px-3 py-2 text-[12.5px] font-semibold text-text">+ Add Certification</button>
+                <button type="button" onClick={() => downloadPdfFromRef(achievementsReportRef, `${student.registerNo}-achievements.pdf`)} className="rounded-lg border border-border bg-white px-3 py-2 text-[12.5px] font-semibold text-text">Download Achievements PDF</button>
+                <button type="button" onClick={() => downloadPdfFromRef(semesterReportRef, `${student.registerNo}-semester-report.pdf`)} className="rounded-lg border border-border bg-white px-3 py-2 text-[12.5px] font-semibold text-text">Download Semester Report PDF</button>
+              </div>
+
+              <Section title="Achievements">
+                <div className="space-y-2">
+                  {(student.achievements ?? []).length === 0 ? (
+                    <div className="text-[12.5px] text-text2">No achievements yet.</div>
+                  ) : (
+                    student.achievements.map((a) => (
+                      <div key={a.id} className="rounded-lg border border-border bg-page-bg p-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="text-[12.5px] font-bold text-text">{a.title}</div>
+                          <Pill tone="blue">{a.category}</Pill>
+                        </div>
+                        <div className="text-[12px] text-text2 mt-1">{a.date} · {a.source}</div>
+                        <div className="text-[12.5px] text-text mt-1">{a.details}</div>
+                        {a.fileName ? <div className="text-[11px] text-text2 mt-1">Certificate: {a.fileName}</div> : null}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </Section>
+
+              <Section title="Certifications">
+                <div className="space-y-2">
+                  {(student.certifications ?? []).length === 0 ? (
+                    <div className="text-[12.5px] text-text2">No certifications yet.</div>
+                  ) : (
+                    student.certifications.map((c) => (
+                      <div key={c.id} className="rounded-lg border border-border bg-page-bg p-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="text-[12.5px] font-bold text-text">{c.title}</div>
+                          <Pill>{c.provider}</Pill>
+                        </div>
+                        <div className="text-[12px] text-text2 mt-1">{c.date} · {c.source}</div>
+                        <div className="text-[12.5px] text-text mt-1">{c.details}</div>
+                        {c.fileName ? <div className="text-[11px] text-text2 mt-1">File: {c.fileName}</div> : null}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </Section>
+
+              <div ref={achievementsReportRef} className="rounded-xl border border-border bg-white p-4">
+                <div className="text-[14px] font-bold text-text">Student Achievements Report</div>
+                <div className="text-[12px] text-text2">{student.name} · {student.registerNo}</div>
+                <div className="mt-3 space-y-2 text-[12.5px]">
+                  <div className="font-semibold text-text">Achievements</div>
+                  {(student.achievements ?? []).map((a) => (
+                    <div key={a.id} className="border-b border-border pb-2">
+                      <div className="font-semibold">{a.title} ({a.category})</div>
+                      <div className="text-text2">{a.date} — {a.details}</div>
+                    </div>
+                  ))}
+                  <div className="font-semibold text-text pt-2">Events Participated</div>
+                  {(student.activities ?? []).map((act) => (
+                    <div key={act} className="text-text2">{act}</div>
+                  ))}
+                  <div className="font-semibold text-text pt-2">Certifications</div>
+                  {(student.certifications ?? []).map((c) => (
+                    <div key={c.id} className="border-b border-border pb-2">
+                      <div className="font-semibold">{c.title} ({c.provider})</div>
+                      <div className="text-text2">{c.date} — {c.details}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div ref={semesterReportRef} className="rounded-xl border border-border bg-white p-4">
+                <div className="text-[14px] font-bold text-text">Semester Report — Sem {student.semester}</div>
+                <div className="text-[12px] text-text2">{student.name} · {student.registerNo} · {student.degree}</div>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2 text-[12.5px]">
+                  <div className="rounded-lg border border-border p-2"><span className="text-text2">IA-1:</span> <span className="font-semibold">{student.academics?.iaMarks ?? "—"}</span></div>
+                  <div className="rounded-lg border border-border p-2"><span className="text-text2">IA-2:</span> <span className="font-semibold">{Math.max(0, (student.academics?.iaMarks ?? 0) - 2)}</span></div>
+                  <div className="rounded-lg border border-border p-2"><span className="text-text2">Attendance:</span> <span className="font-semibold">{attendancePct}%</span></div>
+                  <div className="rounded-lg border border-border p-2"><span className="text-text2">Fee:</span> <span className="font-semibold">{feeStatus}</span></div>
+                </div>
+                <div className="mt-3 text-[12.5px]">
+                  <div className="font-semibold text-text">Certifications & Achievements</div>
+                  {(student.achievements ?? []).map((a) => <div key={a.id} className="text-text2">{a.title} — {a.date}</div>)}
+                  {(student.certifications ?? []).map((c) => <div key={c.id} className="text-text2">{c.title} — {c.date}</div>)}
+                </div>
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
+
+      {achievementModalOpen ? (
+        <div className="fixed inset-0 z-90 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-border bg-white p-4 shadow-2xl">
+            <div className="text-[14px] font-bold text-text mb-3">Add Achievement</div>
+            <div className="space-y-2">
+              <input value={achievementForm.title} onChange={(e) => setAchievementForm((p) => ({ ...p, title: e.target.value }))} placeholder="Achievement title" className="w-full rounded-lg border border-border px-3 py-2 text-[13px]" />
+              <select value={achievementForm.category} onChange={(e) => setAchievementForm((p) => ({ ...p, category: e.target.value }))} className="w-full rounded-lg border border-border px-3 py-2 text-[13px]">
+                {ACHIEVEMENT_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+              <input type="date" value={achievementForm.date} onChange={(e) => setAchievementForm((p) => ({ ...p, date: e.target.value }))} className="w-full rounded-lg border border-border px-3 py-2 text-[13px]" />
+              <textarea value={achievementForm.details} onChange={(e) => setAchievementForm((p) => ({ ...p, details: e.target.value }))} rows={3} placeholder="Date / details" className="w-full rounded-lg border border-border px-3 py-2 text-[13px]" />
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-[#9B2335] px-3 py-2 text-[12.5px] font-semibold text-white">
+                Upload certificate
+                <input type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden" onChange={(e) => handleAchievementFile(e.target.files?.[0])} />
+              </label>
+              {achievementForm.fileName ? <div className="text-[12px] text-text2">{achievementForm.fileName}</div> : null}
+            </div>
+            <div className="mt-3 flex justify-end gap-2">
+              <button type="button" onClick={() => setAchievementModalOpen(false)} className="rounded-lg border border-border px-3 py-2 text-[12.5px] font-semibold">Cancel</button>
+              <button type="button" onClick={addAchievement} className="rounded-lg bg-[#7B1D2E] px-3 py-2 text-[12.5px] font-semibold text-white">Save</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {certModalOpen ? (
+        <div className="fixed inset-0 z-90 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-border bg-white p-4 shadow-2xl">
+            <div className="text-[14px] font-bold text-text mb-3">Add Certification</div>
+            <div className="space-y-2">
+              <input value={certForm.title} onChange={(e) => setCertForm((p) => ({ ...p, title: e.target.value }))} placeholder="Certification title" className="w-full rounded-lg border border-border px-3 py-2 text-[13px]" />
+              <input value={certForm.provider} onChange={(e) => setCertForm((p) => ({ ...p, provider: e.target.value }))} placeholder="Provider (e.g. LinkedIn)" className="w-full rounded-lg border border-border px-3 py-2 text-[13px]" />
+              <input type="date" value={certForm.date} onChange={(e) => setCertForm((p) => ({ ...p, date: e.target.value }))} className="w-full rounded-lg border border-border px-3 py-2 text-[13px]" />
+              <textarea value={certForm.details} onChange={(e) => setCertForm((p) => ({ ...p, details: e.target.value }))} rows={3} placeholder="Details" className="w-full rounded-lg border border-border px-3 py-2 text-[13px]" />
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-[#0B4B5A] px-3 py-2 text-[12.5px] font-semibold text-white">
+                Upload certificate
+                <input type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden" onChange={(e) => handleCertFile(e.target.files?.[0])} />
+              </label>
+              {certForm.fileName ? <div className="text-[12px] text-text2">{certForm.fileName}</div> : null}
+            </div>
+            <div className="mt-3 flex justify-end gap-2">
+              <button type="button" onClick={() => setCertModalOpen(false)} className="rounded-lg border border-border px-3 py-2 text-[12.5px] font-semibold">Cancel</button>
+              <button type="button" onClick={addCertification} className="rounded-lg bg-[#0B4B5A] px-3 py-2 text-[12.5px] font-semibold text-white">Save</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <TaskModal
         open={taskModalOpen}

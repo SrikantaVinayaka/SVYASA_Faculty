@@ -1188,124 +1188,69 @@ export default function App() {
                             {row.showOD ? (
                               <div className="mx-auto mt-3 w-full max-w-xs rounded-lg border border-orange-200 bg-orange-50 p-3 text-left">
                                 <p className="mb-2 text-xs font-semibold text-orange-900">OD reason / exception</p>
-                                <select
-                                  value={row.odRequestType || "Higher Authority Verification"}
-                                  onChange={(event) =>
-                                    setRows((prev) => ({
-                                      ...prev,
-                                      [student.id]: {
-                                        ...prev[student.id],
-                                        odRequestType: event.target.value,
-                                      },
-                                    }))
-                                  }
-                                  className="mb-2 w-full rounded border border-orange-300 px-2 py-1 text-xs"
-                                  disabled={!isStudentEditEnabled(student.id)}
+                                <div className="mb-2 rounded border border-orange-200 bg-white px-2 py-2 text-xs text-orange-900">
+                                  <div className="font-semibold">Reason: {row.odRequestType || "—"}</div>
+                                  <div className="mt-1 text-orange-800">{row.comment?.trim() || "No reason submitted"}</div>
+                                </div>
+                                <label
+                                  className={`mb-2 inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold text-white ${
+                                    isStudentEditEnabled(student.id) ? "cursor-pointer bg-[#9B2335] hover:opacity-95" : "cursor-not-allowed bg-gray-400"
+                                  }`}
                                 >
-                                  {OD_REQUEST_TYPES.map((type) => (
-                                    <option key={type} value={type}>
-                                      {type}
-                                    </option>
-                                  ))}
-                                </select>
-                                <input
-                                  type="text"
-                                  value={row.comment || ""}
-                                  onChange={(event) =>
-                                    setRows((prev) => ({
-                                      ...prev,
-                                      [student.id]: {
-                                        ...prev[student.id],
-                                        comment: event.target.value,
-                                      },
-                                    }))
-                                  }
-                                  placeholder="Comment is required"
-                                  className="mb-2 w-full rounded border border-orange-300 px-2 py-1 text-xs"
-                                  disabled={!isStudentEditEnabled(student.id)}
-                                />
-                                <input
-                                  type="file"
-                                  className="mb-2 block w-full text-xs"
-                                  onChange={(event) =>
-                                    setRows((prev) => ({
-                                      ...prev,
-                                      [student.id]: {
-                                        ...prev[student.id],
-                                        file: event.target.files?.[0] || null,
-                                      },
-                                    }))
-                                  }
-                                  disabled={!isStudentEditEnabled(student.id)}
-                                />
+                                  <Upload size={12} /> Choose File
+                                  <input
+                                    type="file"
+                                    className="hidden"
+                                    accept=".pdf,.jpg,.jpeg,.png"
+                                    onChange={(event) =>
+                                      setRows((prev) => ({
+                                        ...prev,
+                                        [student.id]: {
+                                          ...prev[student.id],
+                                          file: event.target.files?.[0] || null,
+                                        },
+                                      }))
+                                    }
+                                    disabled={!isStudentEditEnabled(student.id)}
+                                  />
+                                </label>
+                                {row.file ? (
+                                  <div className="mb-2 truncate text-xs text-gray-700">Attached: {row.file.name}</div>
+                                ) : null}
                                 <div className="mb-2 rounded border border-orange-200 bg-white px-2 py-2 text-xs">
                                   <div className="mb-1 font-semibold text-orange-900">
                                     Higher authority verification: {row.odAuthorityStatus || "Not Requested"}
                                   </div>
-                                  <div className="flex gap-2">
-                                    <button
-                                      onClick={() =>
-                                        setRows((prev) => ({
-                                          ...prev,
-                                          [student.id]: {
-                                            ...prev[student.id],
-                                            odAuthorityStatus: "Requested",
-                                          },
-                                        }))
-                                      }
-                                      className="rounded border border-orange-300 px-2 py-1 text-xs"
-                                    >
-                                      Request Verify
-                                    </button>
-                                    <button
-                                      onClick={() =>
-                                        setRows((prev) => ({
-                                          ...prev,
-                                          [student.id]: {
-                                            ...prev[student.id],
-                                            odAuthorityStatus: "Verified",
-                                          },
-                                        }))
-                                      }
-                                      className="rounded border border-green-300 px-2 py-1 text-xs"
-                                    >
-                                      Mark Verified
-                                    </button>
-                                  </div>
+                                  <button
+                                    onClick={() =>
+                                      setRows((prev) => ({
+                                        ...prev,
+                                        [student.id]: {
+                                          ...prev[student.id],
+                                          odAuthorityStatus: "Requested",
+                                        },
+                                      }))
+                                    }
+                                    disabled={!isStudentEditEnabled(student.id)}
+                                    className="rounded border border-orange-300 bg-orange-50 px-2 py-1 text-xs font-semibold text-orange-900 hover:bg-orange-100 disabled:cursor-not-allowed disabled:opacity-50"
+                                  >
+                                    Request Verification
+                                  </button>
                                 </div>
                                 <div className="mb-2 rounded border border-orange-200 bg-white px-2 py-2 text-xs">
-                                  <div className="mb-1 font-semibold text-orange-900">
-                                    Mentor approval: {row.mentorApproval || "Pending"}
-                                  </div>
-                                  <div className="flex gap-2">
-                                    <button
-                                      onClick={() =>
-                                        setRows((prev) => ({
-                                          ...prev,
-                                          [student.id]: {
-                                            ...prev[student.id],
-                                            mentorApproval: "Approved",
-                                          },
-                                        }))
+                                  <div className="font-semibold text-orange-900">
+                                    Mentor Approval:{" "}
+                                    <span
+                                      className={
+                                        row.mentorApproval === "Approved"
+                                          ? "text-green-700"
+                                          : row.mentorApproval === "Rejected"
+                                            ? "text-red-700"
+                                            : "text-amber-700"
                                       }
-                                      className="rounded border border-green-300 px-2 py-1 text-xs"
                                     >
-                                      Approve
-                                    </button>
-                                    <button
-                                      onClick={() =>
-                                        setRows((prev) => ({
-                                          ...prev,
-                                          [student.id]: {
-                                            ...prev[student.id],
-                                            mentorApproval: "Rejected",
-                                          },
-                                        }))
-                                      }
-                                      className="rounded border border-red-300 px-2 py-1 text-xs"
-                                    >
-                                      Reject
-                                    </button>
+                                      {row.mentorApproval || "Pending"}
+                                    </span>
                                   </div>
                                 </div>
                                 <div className="flex justify-between gap-2">
@@ -1333,32 +1278,16 @@ export default function App() {
                                   <span className={`rounded-full px-2 py-1 text-xs font-semibold ${statusPillClass(status)}`}>
                                     OD
                                   </span>
-                                  <input
-                                    type="text"
-                                    value={row.comment || ""}
-                                    onChange={(event) =>
-                                      setRows((prev) => ({
-                                        ...prev,
-                                        [student.id]: {
-                                          ...prev[student.id],
-                                          comment: event.target.value,
-                                        },
-                                      }))
-                                    }
-                                    placeholder="Add comment"
-                                    className="w-full rounded border border-gray-300 px-2 py-1 text-xs"
-                                    disabled={!isStudentEditEnabled(student.id)}
-                                  />
+                                  <span className="text-xs text-gray-700">
+                                    {row.odRequestType || "—"} — {row.comment?.trim() || "No reason"}
+                                  </span>
                                   {row.file ? (
-                                    <span className="max-w-full truncate text-xs text-gray-700">
-                                      File: {row.file.name}
-                                    </span>
+                                    <span className="max-w-full truncate text-xs text-gray-600">File: {row.file.name}</span>
                                   ) : (
-                                    <span className="text-xs text-gray-400">Attachment: none</span>
+                                    <span className="text-xs text-gray-400">No attachment</span>
                                   )}
                                   <span className="text-xs text-gray-600">
-                                    {row.odRequestType || "Higher Authority Verification"} |{" "}
-                                    {row.odAuthorityStatus || "Not Requested"} | Mentor:{" "}
+                                    Verification: {row.odAuthorityStatus || "Not Requested"} · Mentor:{" "}
                                     {row.mentorApproval || "Pending"}
                                   </span>
                                 </>
@@ -1367,22 +1296,11 @@ export default function App() {
                                   <span className={`rounded-full px-2 py-1 text-xs font-semibold ${statusPillClass(status)}`}>
                                     {status === STATUS.PRESENT ? "Present" : "Absent"}
                                   </span>
-                                  <input
-                                    type="text"
-                                    value={row.comment || ""}
-                                    onChange={(event) =>
-                                      setRows((prev) => ({
-                                        ...prev,
-                                        [student.id]: {
-                                          ...prev[student.id],
-                                          comment: event.target.value,
-                                        },
-                                      }))
-                                    }
-                                    placeholder="Add remarks"
-                                    className="w-full rounded border border-gray-300 px-2 py-1 text-xs"
-                                    disabled={!isStudentEditEnabled(student.id)}
-                                  />
+                                  {row.comment?.trim() ? (
+                                    <span className="text-xs text-gray-600">{row.comment}</span>
+                                  ) : (
+                                    <span className="text-xs text-gray-400">No remarks</span>
+                                  )}
                                 </>
                               )}
                             </div>

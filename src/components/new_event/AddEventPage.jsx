@@ -947,7 +947,7 @@ export default function AddEventPage() {
         <div className="stack">
           <div className="page-header">
             <p style={{ fontSize:12, color:"#9ca3af", marginBottom:4 }}>Events / <span style={{ color:"var(--maroon)" }}>Add Event</span></p>
-            <h1>Add Event</h1>
+            <h1>Create Event</h1>
           </div>
 
           <Card id="dept" icon="🏛" title="Department Details">
@@ -957,11 +957,11 @@ export default function AddEventPage() {
             </Fld>
           </Card>
 
-          <Card id="logo" icon="🖼" title="Institution Logo">
+          {/* <Card id="logo" icon="🖼" title="Institution Logo">
             <Upload label="Upload Logo" multiple={false}
               files={f.logoFile ? [f.logoFile] : []}
               onChange={arr => set("logoFile", arr[0] || null)} />
-          </Card>
+          </Card> */}
 
           <Card id="event" icon="📅" title="Event Details">
             <Fld label="Event Title">

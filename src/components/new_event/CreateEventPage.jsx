@@ -427,7 +427,7 @@ export default function CreateEventPage() {
                 name="authorityDesignation"
                 value={f.authorityDesignation}
                 onChange={fld}
-                placeholder="e.g. Head of Department"
+                  placeholder="e.g. Head of Department"
                 className="h-10 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 text-sm text-white outline-none focus:border-[#7B1C2A]"
               />
             </Field>
