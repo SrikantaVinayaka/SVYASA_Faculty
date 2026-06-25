@@ -10,7 +10,7 @@ import Events from "./components/new_event/Events.jsx";
 import CreateEventPage from "./components/new_event/CreateEventPage.jsx";
 
 import AddEventPage from "./components/new_event/AddEventPage.jsx";
-import MyProfile from "./components/MyProfile/MyProfile.jsx";
+import MyProfile from "./components/MyProfile/MyProfile111.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
 // import MentoringPage from "./pages/MentoringPage.jsx";
 import Mentoring from "./components/Mentoring/Mentoring.jsx";
@@ -47,7 +47,7 @@ export default function App() {
     }
     if (
       activeId === "assessment" &&
-      !["IA Mean %", "Marks Scored", "Other Assessment", "Question Paper Status", "MCQ"].includes(activeChild)
+      !["IA Mean %", "Internal Assessment", "Marks Scored", "Other Assessment", "Question Paper Status", "MCQ"].includes(activeChild)
     ) {
       setActiveChild("Marks Scored");
     }

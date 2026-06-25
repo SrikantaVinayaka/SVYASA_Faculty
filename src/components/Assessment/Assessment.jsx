@@ -7,7 +7,7 @@ export default function Assessment({ tab, onTabChange }) {
     return <MarksScore />;
   }
 
-  if (tab === "IA Mean %") {
+  if (tab === "IA Mean %" || tab === "Internal Assessment") {
     return <IA_Mean />;
   }
 
