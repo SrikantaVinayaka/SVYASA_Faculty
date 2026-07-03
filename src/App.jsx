@@ -47,7 +47,7 @@ export default function App() {
     }
     if (
       activeId === "assessment" &&
-      !["IA Mean %", "Internal Assessment", "Marks Scored", "Other Assessment", "Question Paper Status", "MCQ"].includes(activeChild)
+      !["Internal assessment", "Marks Scored", "Other Assessment", "Question Paper Status", "MCQ"].includes(activeChild)
     ) {
       setActiveChild("Marks Scored");
     }

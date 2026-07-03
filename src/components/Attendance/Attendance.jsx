@@ -1,8 +1,17 @@
-// next change, remove Higher Authority Verification from OD types and related logic, as it's not a valid OD type and causes confusion in the code. Adjust the default OD type to "Medical" or another valid type as needed.
-
-
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Upload, Download, Save, FileCheck, CalendarClock, AlertCircle } from "lucide-react";
+import {
+  Upload,
+  Download,
+  Save,
+  FileCheck,
+  CalendarClock,
+  AlertCircle,
+  Search,
+  RefreshCw,
+  LayoutGrid,
+  Eye,
+  Calendar,
+} from "lucide-react";
 import * as XLSX from "xlsx";
 import AttendanceView from "./AttendanceView";
 import ReportGenerationView from "./ReportGenerationView";
@@ -15,7 +24,7 @@ const STATUS = {
   ABSENT: "A",
   ON_DUTY: "OD",
 };
-const OD_REQUEST_TYPES = [/*"Higher Authority Verification",*/ "Medical", "Event / Competition", "Other"];
+const OD_REQUEST_TYPES = ["Higher Authority Verification", "Medical", "Event / Competition", "Other"];
 
 const students = [
   { id: 1, usn: "2022508001", name: "Aarav Nair" },
@@ -155,9 +164,10 @@ function getInitialRows() {
       showOD: false,
       comment: "",
       file: null,
+      documentSent: false,
       odRequestType: "Higher Authority Verification",
       odAuthorityStatus: "Not Requested",
-      mentorApproval: "Pending",
+      mentorApproval: "Not Sent",
     };
     return acc;
   }, {});
@@ -218,9 +228,10 @@ function buildRowsFromAttendance(attendance = []) {
       showOD: false,
       comment: matched?.comment || "",
       file: null,
+      documentSent: false,
       odRequestType: "Higher Authority Verification",
       odAuthorityStatus: "Not Requested",
-      mentorApproval: "Pending",
+      mentorApproval: "Not Sent",
     };
     return acc;
   }, {});
@@ -337,11 +348,17 @@ function mergeMissingMarchSeeds(existingRecords = []) {
   return [...existingRecords, ...buildMarchSeedRecords()];
 }
 
-export default function App() {
+export default function Attendance({ tab = "Student Attendance", onTabChange } = {}) {
   const defaultTimetable = timetable[0];
   const defaultMarkAllStatus = STATUS.PRESENT;
   const [rows, setRows] = useState({});
-  const [activeModule, setActiveModule] = useState("mark");
+  const tabToModule = {
+    "Student Attendance": "mark",
+    "View Attendance": "view",
+    "View Report": "report",
+    "Attendance Report": "report",
+  };
+  const [activeModule, setActiveModule] = useState(() => tabToModule[tab] || "mark");
   const [markAllStatus, setMarkAllStatus] = useState(defaultMarkAllStatus);
   const [selectedFaculty, setSelectedFaculty] = useState(facultyNames[0]);
   const [currentRecordId, setCurrentRecordId] = useState(null);
@@ -371,6 +388,20 @@ export default function App() {
     subject: defaultTimetable.subject,
     section: defaultTimetable.section,
   });
+  const [searchQuery, setSearchQuery] = useState("");
+  const [classType, setClassType] = useState("Regular");
+  const [selectedDate, setSelectedDate] = useState(defaultTimetable.date);
+  const [showSyncModal, setShowSyncModal] = useState(false);
+  const [showMergeModal, setShowMergeModal] = useState(false);
+  const [mergedSections, setMergedSections] = useState([]);
+  const [syncSelections, setSyncSelections] = useState(() =>
+    students.slice(0, 8).map((student) => ({ id: student.id, usn: student.usn, name: student.name, selected: true }))
+  );
+
+  useEffect(() => {
+    const module = tabToModule[tab] || "mark";
+    setActiveModule(module);
+  }, [tab]);
 
   useEffect(() => {
     setRows(getInitialRows());
@@ -416,10 +447,7 @@ export default function App() {
     return stats;
   }, [attendanceRecords]);
 
-
-  
   const selectedTimetable = useMemo(() => {
-    
     return (
       timetable.find(
         (entry) =>
@@ -436,7 +464,67 @@ export default function App() {
     }
 
     return `${selectedTimetable.department} | Sem ${selectedTimetable.semester} | ${selectedTimetable.subject} | Sec ${classInfo.section || "-"} | ${selectedTimetable.date} | ${selectedTimetable.slot}`;
+  }, [selectedTimetable, classInfo.section]);
+
+  const filteredStudents = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return students;
+    return students.filter(
+      (student) =>
+        student.name.toLowerCase().includes(query) || student.usn.toLowerCase().includes(query)
+    );
+  }, [searchQuery]);
+
+  const selectionSummary = useMemo(() => {
+    const dept = "MCA-DET-CC";
+    const sem = classInfo.semester ? `Semester ${classInfo.semester}-2025` : "Semester -";
+    const subj = classInfo.subject || "Course";
+    const courseCode =
+      classInfo.subject?.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8) || "MCAP256";
+    const sec = classInfo.section ? `MCA-${classInfo.section}` : "MCA-";
+    const mergedLabel =
+      mergedSections.length > 1
+        ? mergedSections.map((section) => `MCA-${section}`).join(", ")
+        : sec;
+    return `${dept}-${sem}-${courseCode}-${mergedLabel}`;
+  }, [classInfo, mergedSections]);
+
+  const freezingDate = useMemo(() => {
+    const base = selectedTimetable?.date || selectedDate;
+    const date = new Date(base);
+    if (Number.isNaN(date.getTime())) return "26 Jun 2026";
+    date.setDate(date.getDate() + 1);
+    return date.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+  }, [selectedTimetable, selectedDate]);
+
+  const previousClassDate = useMemo(() => {
+    const base = selectedTimetable?.date || selectedDate;
+    const date = new Date(base);
+    if (Number.isNaN(date.getTime())) return "24 Jun 2026";
+    date.setDate(date.getDate() - 1);
+    return date.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+  }, [selectedTimetable, selectedDate]);
+
+  useEffect(() => {
+    if (selectedTimetable?.date) {
+      setSelectedDate(selectedTimetable.date);
+    }
   }, [selectedTimetable]);
+
+  const goToMark = () => {
+    setActiveModule("mark");
+    onTabChange?.("Student Attendance");
+  };
+
+  const goToView = () => {
+    setActiveModule("view");
+    onTabChange?.("View Attendance");
+  };
+
+  const goToReport = () => {
+    setActiveModule("report");
+    onTabChange?.("View Report");
+  };
 
   const isClassSelected = Boolean(selectedTimetable && classInfo.section);
   const isEditLocked = false;
@@ -479,14 +567,45 @@ export default function App() {
     setError("");
   };
 
+  const sendODDocument = (id) => {
+    if (!isStudentEditEnabled(id) || !isClassSelected) return;
+    if (!rows[id]?.file) {
+      setError("Choose a document before sending to mentor.");
+      return;
+    }
+
+    setRows((prev) => ({
+      ...prev,
+      [id]: {
+        ...prev[id],
+        documentSent: true,
+        mentorApproval: "Approval Pending",
+      },
+    }));
+    setMessage(`Document sent to mentor for ${students.find((s) => s.id === id)?.name || "student"}. Approval pending.`);
+    setError("");
+  };
+
   const saveOD = (id) => {
     if (!isStudentEditEnabled(id) || !isClassSelected) return;
+    if (!rows[id]?.file) {
+      setError("Choose a supporting document before saving OD.");
+      return;
+    }
+    if (!rows[id]?.documentSent) {
+      setError("Send the document to mentor before saving.");
+      return;
+    }
     if (!rows[id]?.comment?.trim()) {
       setError("OD requires a comment before saving.");
       return;
     }
     if (rows[id]?.mentorApproval !== "Approved") {
-      setError("Mentor approval is required before saving OD.");
+      setError(
+        rows[id]?.mentorApproval === "Rejected"
+          ? "Mentor rejected this OD request. Update details or exit."
+          : "Mentor approval is still pending. Wait for approval before saving."
+      );
       return;
     }
 
@@ -514,12 +633,51 @@ export default function App() {
         showOD: false,
         comment: "",
         file: null,
+        documentSent: false,
         odRequestType: "Higher Authority Verification",
         odAuthorityStatus: "Not Requested",
-        mentorApproval: "Pending",
+        mentorApproval: "Not Sent",
       },
     }));
     setMessage("OD canceled. Student reverted to Present.");
+    setError("");
+  };
+
+  const applySyncMeetingAttendees = () => {
+    const selectedIds = new Set(syncSelections.filter((entry) => entry.selected).map((entry) => entry.id));
+    if (selectedIds.size === 0) {
+      setError("Select at least one attendee to sync.");
+      return;
+    }
+
+    setRows((prev) => {
+      const next = { ...prev };
+      students.forEach((student) => {
+        if (selectedIds.has(student.id)) {
+          next[student.id] = {
+            ...next[student.id],
+            status: STATUS.PRESENT,
+            showOD: false,
+          };
+        }
+      });
+      return next;
+    });
+
+    setShowSyncModal(false);
+    setMessage(`Synced ${selectedIds.size} meeting attendee${selectedIds.size === 1 ? "" : "s"} as Present.`);
+    setError("");
+  };
+
+  const applyMergedSections = (sections) => {
+    setMergedSections(sections);
+    setShowMergeModal(false);
+    if (sections.length > 0) {
+      setClassInfo((prev) => ({ ...prev, section: sections[0] }));
+      setMessage(`Merged sections: ${sections.map((s) => `MCA-${s}`).join(", ")}`);
+    } else {
+      setMessage("Course sections unmerged.");
+    }
     setError("");
   };
 
@@ -736,7 +894,7 @@ export default function App() {
 
     const pendingApproval = students.find((student) => {
       const row = rows[student.id];
-      return row?.status === STATUS.ON_DUTY && row?.mentorApproval !== "Approved";
+      return row?.status === STATUS.ON_DUTY && row?.documentSent && row?.mentorApproval !== "Approved";
     });
     if (pendingApproval) {
       return `Mentor approval pending for ${pendingApproval.usn}.`;
@@ -805,6 +963,8 @@ export default function App() {
         showOD: false,
         comment: fromRecord?.comment || "",
         file: null,
+        documentSent: false,
+        mentorApproval: "Not Sent",
       };
       return acc;
     }, {});
@@ -819,7 +979,7 @@ export default function App() {
     setSelectedFaculty(record.context?.faculty || facultyNames[0]);
     setCurrentRecordId(record.recordId || null);
     setIsSubmitted(true);
-    setActiveModule("mark");
+    goToMark();
     setMessage("Record opened in marking page.");
     setError("");
   };
@@ -848,181 +1008,255 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen px-4 py-8 md:px-8">
-      <div className="mx-auto max-w-7xl rounded-3xl bg-panel/95 p-5 shadow-card md:p-8">
-        <div className="mb-4 flex flex-wrap gap-2">
-          <button
-            onClick={() => setActiveModule("mark")}
-            className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${
-              activeModule === "mark"
-                ? "text-white shadow-md"
-                : "border border-gray-300 bg-white text-slate-700 hover:bg-slate-50"
-            }`}
-            style={activeModule === "mark" ? { background: BRAND_GRADIENT } : undefined}
-          >
-            Mark Attendance
-          </button>
-          <button
-            onClick={() => setActiveModule("view")}
-            className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${
-              activeModule === "view"
-                ? "text-white shadow-md"
-                : "border border-gray-300 bg-white text-slate-700 hover:bg-slate-50"
-            }`}
-            style={activeModule === "view" ? { background: BRAND_GRADIENT } : undefined}
-          >
-            Attendance View
-          </button>
-          <button
-            onClick={() => setActiveModule("report")}
-            className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${
-              activeModule === "report"
-                ? "text-white shadow-md"
-                : "border border-gray-300 bg-white text-slate-700 hover:bg-slate-50"
-            }`}
-            style={activeModule === "report" ? { background: BRAND_GRADIENT } : undefined}
-          >
-            Report Generation
-          </button>
+    <main
+      className="flex-1 overflow-y-auto p-6 pb-12"
+      style={{ scrollbarWidth: "thin", scrollbarColor: "#D1D5DB transparent" }}
+    >
+      {activeModule === "view" ? (
+        <div style={{ maxHeight: "calc(100vh - 120px)", overflowY: "auto" }}>
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <p className="text-[12px] text-text2">Student Attendance / View Attendance</p>
+              <h1 className="text-[18px] font-bold text-text">Attendance View</h1>
+            </div>
+            <button
+              onClick={goToMark}
+              className="rounded-lg border border-border px-4 py-2 text-[13px] font-semibold text-text hover:bg-page-bg"
+            >
+              ← Back to Mark Attendance
+            </button>
+          </div>
+          <AttendanceView
+            records={attendanceRecords}
+            onOpenRecord={openRecordInMarkingPage}
+            onDeleteRecord={deleteRecord}
+            onClearAll={clearAllRecords}
+          />
         </div>
-
-        {activeModule === "view" ? (
-          <div style={{ maxHeight: "calc(100vh - 200px)", overflowY: "auto", paddingRight: "8px" }}>
-            <AttendanceView
-              records={attendanceRecords}
-              onOpenRecord={openRecordInMarkingPage}
-              onDeleteRecord={deleteRecord}
-              onClearAll={clearAllRecords}
-            />
+      ) : activeModule === "report" ? (
+        <div style={{ maxHeight: "calc(100vh - 120px)", overflowY: "auto" }}>
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <p className="text-[12px] text-text2">Student Attendance / View Report</p>
+              <h1 className="text-[18px] font-bold text-text">Attendance Report</h1>
+            </div>
+            <button
+              onClick={goToMark}
+              className="rounded-lg border border-border px-4 py-2 text-[13px] font-semibold text-text hover:bg-page-bg"
+            >
+              ← Back to Mark Attendance
+            </button>
           </div>
-        ) : activeModule === "report" ? (
-          <div style={{ maxHeight: "calc(100vh - 200px)", overflowY: "auto", paddingRight: "8px" }}>
-            <ReportGenerationView
-              records={attendanceRecords}
-              students={students}
-              currentClassInfo={classInfo}
-              currentTimetable={selectedTimetable}
-              onOpenRecord={openRecordInMarkingPage}
-              onGoToMark={() => setActiveModule("mark")}
-              onGoToView={() => setActiveModule("view")}
-            />
+          <ReportGenerationView
+            records={attendanceRecords}
+            students={students}
+            currentClassInfo={classInfo}
+            currentTimetable={selectedTimetable}
+            onOpenRecord={openRecordInMarkingPage}
+            onGoToMark={goToMark}
+            onGoToView={goToView}
+          />
+        </div>
+      ) : (
+        <div style={{ maxHeight: "calc(100vh - 120px)", overflowY: "auto" }}>
+          {/* Page header */}
+          <div className="mb-4">
+            <p className="text-[12px] text-text2 mb-1">Student Attendance / Mark Attendance</p>
+            <h1 className="text-[20px] font-bold text-text">Mark Attendance</h1>
           </div>
-        ) : (
-          <div style={{ maxHeight: "calc(100vh - 200px)", overflowY: "auto", paddingRight: "8px" }}>
-            <header className="mb-6 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-              <div>
-                <h1 className="text-3xl font-bold tracking-tight text-ink">Student Attendance</h1>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="inline-flex items-center gap-2 rounded-full bg-amber-100 px-4 py-2 text-xs font-semibold text-amber-900">
-                  Faculty: {selectedFaculty}
-                </div>
-                <div className="inline-flex items-center gap-2 rounded-full bg-page-bg px-4 py-2 text-xs font-semibold text-text">
-                  <CalendarClock size={14} />
-                  {contextLabel}
-                </div>
-              </div>
-            </header>
 
-            <section className="mb-5 rounded-2xl border border-orange-100 bg-white p-4">
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-7">
-                <select value={classInfo.department} className="rounded-lg border border-gray-300 px-3 py-2 text-sm" disabled>
-                  <option value="MCA">MCA</option>
-                </select>
+          {/* Filter dropdowns */}
+          <section className="mb-4 rounded-xl border border-border bg-white p-4">
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+              <select
+                value={classInfo.department}
+                className="rounded-lg border border-border bg-white px-3 py-2 text-[12.5px] text-text"
+                disabled
+              >
+                <option value="MCA">MCA-DET-CC</option>
+              </select>
 
-                <select
-                  value={selectedFaculty}
-                  onChange={(event) => setSelectedFaculty(event.target.value)}
-                  className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-[rgba(123,29,46,0.25)] focus:border-transparent"
-                  disabled={isEditLocked}
-                >
-                  {facultyNames.map((faculty) => (
-                    <option key={faculty} value={faculty}>
-                      {faculty}
-                    </option>
-                  ))}
-                </select>
+              <select
+                value={classInfo.semester}
+                onChange={(event) =>
+                  setClassInfo((prev) => ({
+                    ...prev,
+                    semester: event.target.value,
+                    subject: "",
+                    section: "",
+                  }))
+                }
+                className="rounded-lg border border-border bg-white px-3 py-2 text-[12.5px] text-text outline-none focus:ring-2 focus:ring-[rgba(155,35,53,0.2)]"
+                disabled={isEditLocked}
+              >
+                <option value="">Semester</option>
+                {semesterOptions.map((semester) => (
+                  <option key={semester} value={semester}>
+                    Semester {semester}-2025
+                  </option>
+                ))}
+              </select>
 
-                <select
-                  value={classInfo.semester}
-                  onChange={(event) =>
-                    setClassInfo((prev) => ({
-                      ...prev,
-                      semester: event.target.value,
-                      subject: "",
-                      section: "",
-                    }))
-                  }
-                  className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-[rgba(123,29,46,0.25)] focus:border-transparent"
-                  disabled={isEditLocked}
-                >
-                  <option value="">Semester</option>
-                  {semesterOptions.map((semester) => (
-                    <option key={semester} value={semester}>
-                      {semester}
-                    </option>
-                  ))}
-                </select>
+              <select
+                value={classInfo.subject}
+                onChange={(event) =>
+                  setClassInfo((prev) => ({
+                    ...prev,
+                    subject: event.target.value,
+                    section: "",
+                  }))
+                }
+                className="rounded-lg border border-border bg-white px-3 py-2 text-[12.5px] text-text outline-none focus:ring-2 focus:ring-[rgba(155,35,53,0.2)]"
+                disabled={!classInfo.semester || isEditLocked}
+              >
+                <option value="">Course</option>
+                {subjectOptions.map((subject) => (
+                  <option key={subject} value={subject}>
+                    {subject} ({subject.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8)})
+                  </option>
+                ))}
+              </select>
 
-                <select
-                  value={classInfo.subject}
-                  onChange={(event) =>
-                    setClassInfo((prev) => ({
-                      ...prev,
-                      subject: event.target.value,
-                      section: "",
-                    }))
-                  }
-                  className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-[rgba(123,29,46,0.25)] focus:border-transparent"
-                  disabled={!classInfo.semester || isEditLocked}
-                >
-                  <option value="">Subject</option>
-                  {subjectOptions.map((subject) => (
-                    <option key={subject} value={subject}>
-                      {subject}
-                    </option>
-                  ))}
-                </select>
+              <select
+                value={classInfo.section}
+                onChange={(event) => setClassInfo((prev) => ({ ...prev, section: event.target.value }))}
+                className="rounded-lg border border-border bg-white px-3 py-2 text-[12.5px] text-text outline-none focus:ring-2 focus:ring-[rgba(155,35,53,0.2)]"
+                disabled={!classInfo.subject || isEditLocked}
+              >
+                <option value="">Section</option>
+                {sections.map((section) => (
+                  <option key={section} value={section}>
+                    MCA-{section}
+                  </option>
+                ))}
+              </select>
 
-                <select
-                  value={classInfo.section}
-                  onChange={(event) => setClassInfo((prev) => ({ ...prev, section: event.target.value }))}
-                  className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-[rgba(123,29,46,0.25)] focus:border-transparent"
-                  disabled={!classInfo.subject || isEditLocked}
-                >
-                  <option value="">Section</option>
-                  {sections.map((section) => (
-                    <option key={section} value={section}>
-                      {section}
-                    </option>
-                  ))}
-                </select>
+              <select
+                value={classType}
+                onChange={(event) => setClassType(event.target.value)}
+                className="rounded-lg border border-border bg-white px-3 py-2 text-[12.5px] text-text outline-none focus:ring-2 focus:ring-[rgba(155,35,53,0.2)]"
+              >
+                <option value="Regular">Regular</option>
+                <option value="Special">Special Class</option>
+                <option value="Tutorial">Tutorial</option>
+                <option value="Online">Online</option>
+              </select>
 
+              <div className="relative">
+                <Calendar size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text2" />
                 <input
-                  type="text"
-                  value={selectedTimetable?.date || "Date from timetable"}
-                  readOnly
-                  className="rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-700"
-                />
-
-                <input
-                  type="text"
-                  value={selectedTimetable?.slot || "Time from timetable"}
-                  readOnly
-                  className="rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-700"
+                  type="date"
+                  value={selectedDate}
+                  onChange={(event) => setSelectedDate(event.target.value)}
+                  className="w-full rounded-lg border border-border bg-white py-2 pl-9 pr-3 text-[12.5px] text-text outline-none focus:ring-2 focus:ring-[rgba(155,35,53,0.2)]"
                 />
               </div>
+            </div>
 
-              <div className="mt-3 flex justify-start">
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <div className="relative flex-1 min-w-50">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text2" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="Search by Name or USN"
+                  className="w-full rounded-lg border border-border bg-page-bg py-2 pl-9 pr-3 text-[12.5px] text-text outline-none focus:border-[#9B2335] focus:ring-1 focus:ring-[#9B2335]"
+                />
+              </div>
+              <span className="text-[12px] font-semibold text-red-600">Freezing On : {freezingDate}</span>
+              <div className="ml-auto flex flex-wrap items-center gap-2">
                 <button
-                  onClick={openUploadPopup}
-                  className="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-2 text-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  type="button"
+                  onClick={() => setShowSyncModal(true)}
                   disabled={!isClassSelected}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#2563EB] px-3 py-2 text-[12px] font-semibold text-white hover:bg-[#1d4ed8] disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <Upload size={16} /> Upload Template
+                  <RefreshCw size={14} /> Sync meeting attendees
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowMergeModal(true)}
+                  disabled={!isClassSelected}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#2563EB] px-3 py-2 text-[12px] font-semibold text-white hover:bg-[#1d4ed8] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <LayoutGrid size={14} /> Merge/Unmerge Courses
+                </button>
+                <button
+                  type="button"
+                  onClick={goToView}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#2563EB] px-3 py-2 text-[12px] font-semibold text-white hover:bg-[#1d4ed8]"
+                >
+                  <Eye size={14} /> View Attendance
+                </button>
+                <button
+                  type="button"
+                  onClick={goToReport}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#2563EB] px-3 py-2 text-[12px] font-semibold text-white hover:bg-[#1d4ed8]"
+                >
+                  <Eye size={14} /> View Report
+                </button>
+                <button
+                  type="button"
+                  onClick={openUploadPopup}
+                  disabled={!isClassSelected}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#2563EB] px-3 py-2 text-[12px] font-semibold text-white hover:bg-[#1d4ed8] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Upload size={14} /> Upload
                 </button>
               </div>
-            </section>
+            </div>
+          </section>
+
+          {/* Context info & legend */}
+          <section className="mb-4 rounded-xl border border-border bg-[#E8F4FD] p-4">
+            <div className="mb-2 flex flex-wrap items-center gap-4 text-[11px]">
+              <span className="inline-flex items-center gap-1">
+                <span className="inline-block h-3 w-3 rounded-sm bg-pink-400" /> Extra Curricular Course
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <span className="inline-block h-3 w-3 rounded-sm bg-orange-400" /> Co Curricular Course
+              </span>
+              <button type="button" className="text-[#2563EB] underline hover:no-underline">
+                View Attendance Configuration
+              </button>
+            </div>
+            <p className="mb-3 text-[12px] text-text2">
+              <span className="font-semibold text-text">Selected Dropdown:</span> {selectionSummary}
+            </p>
+            <div className="rounded-lg border border-border bg-white p-3">
+              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-text2">Indicator</p>
+              <div className="flex flex-wrap gap-3 text-[11px]">
+                <span className="inline-flex items-center gap-1">
+                  <span className="inline-block h-4 w-4 rounded bg-blue-500" /> Special Class
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  <span className="inline-block h-4 w-4 rounded bg-orange-400" /> Tutorial Class
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  <span className="inline-block h-4 w-4 rounded bg-pink-400" /> Online Class
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  <span className="inline-flex h-4 w-4 items-center justify-center rounded bg-green-600 text-[10px] text-white">✓</span> Present
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  <span className="inline-flex h-4 w-4 items-center justify-center rounded bg-red-600 text-[10px] text-white">✕</span> Absent
+                </span>
+                <span className="inline-flex items-center gap-1 font-semibold text-gray-600">NA</span>
+                <span className="inline-flex items-center gap-1 font-semibold text-gray-600">OD</span>
+                <span className="inline-flex items-center gap-1">
+                  <span className="inline-block h-4 w-4 rounded bg-gray-800" /> Attendance Marked
+                </span>
+              </div>
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-text2">
+              <CalendarClock size={12} />
+              <span>{contextLabel}</span>
+              <span className="rounded-full bg-amber-100 px-2 py-0.5 font-semibold text-amber-900">
+                Faculty: {selectedFaculty}
+              </span>
+            </div>
+          </section>
 
             {error ? (
               <div className="mb-4 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -1104,32 +1338,160 @@ export default function App() {
               </div>
             ) : null}
 
-            <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
+            {showSyncModal ? (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4 py-6" onClick={() => setShowSyncModal(false)}>
+                <div
+                  className="w-full max-w-lg rounded-xl border border-border bg-white shadow-2xl"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <div className="border-b border-border px-4 py-3">
+                    <h3 className="text-base font-semibold text-text">Sync Meeting Attendees</h3>
+                    <p className="mt-1 text-[12px] text-text2">
+                      Online class participants detected from the latest meeting session.
+                    </p>
+                  </div>
+                  <div className="max-h-72 overflow-y-auto px-4 py-3">
+                    {syncSelections.map((entry) => (
+                      <label
+                        key={entry.id}
+                        className="mb-2 flex cursor-pointer items-center gap-3 rounded-lg border border-border px-3 py-2 hover:bg-page-bg"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={entry.selected}
+                          onChange={(event) =>
+                            setSyncSelections((prev) =>
+                              prev.map((row) =>
+                                row.id === entry.id ? { ...row, selected: event.target.checked } : row
+                              )
+                            )
+                          }
+                        />
+                        <div>
+                          <p className="text-[13px] font-semibold text-text">{entry.name}</p>
+                          <p className="text-[11px] text-text2">{entry.usn}</p>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                  <div className="flex justify-end gap-2 border-t border-border px-4 py-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowSyncModal(false)}
+                      className="rounded-lg border border-border px-4 py-2 text-[13px]"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={applySyncMeetingAttendees}
+                      className="rounded-lg bg-[#2563EB] px-4 py-2 text-[13px] font-semibold text-white hover:bg-[#1d4ed8]"
+                    >
+                      Mark Selected as Present
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            {showMergeModal ? (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4 py-6" onClick={() => setShowMergeModal(false)}>
+                <div
+                  className="w-full max-w-md rounded-xl border border-border bg-white shadow-2xl"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <div className="border-b border-border px-4 py-3">
+                    <h3 className="text-base font-semibold text-text">Merge / Unmerge Course Sections</h3>
+                    <p className="mt-1 text-[12px] text-text2">
+                      Combine sections for joint attendance marking in this session.
+                    </p>
+                  </div>
+                  <div className="space-y-2 px-4 py-4">
+                    {sections.map((section) => {
+                      const checked = mergedSections.includes(section);
+                      return (
+                        <label
+                          key={section}
+                          className="flex cursor-pointer items-center gap-3 rounded-lg border border-border px-3 py-2 hover:bg-page-bg"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(event) => {
+                              setMergedSections((prev) =>
+                                event.target.checked
+                                  ? [...prev, section]
+                                  : prev.filter((item) => item !== section)
+                              );
+                            }}
+                          />
+                          <span className="text-[13px] font-medium text-text">
+                            MCA-{section} · {classInfo.subject || "Selected course"}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                  <div className="flex justify-end gap-2 border-t border-border px-4 py-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMergedSections([]);
+                        applyMergedSections([]);
+                      }}
+                      className="rounded-lg border border-border px-4 py-2 text-[13px]"
+                    >
+                      Unmerge All
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => applyMergedSections(mergedSections)}
+                      className="rounded-lg bg-[#2563EB] px-4 py-2 text-[13px] font-semibold text-white hover:bg-[#1d4ed8]"
+                    >
+                      Apply
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            <section className="overflow-hidden rounded-xl border border-border bg-white">
               <div className="overflow-x-auto">
-                <table className="min-w-full text-sm">
-                  <thead className="bg-orange-50">
+                <table className="min-w-full text-[12.5px]">
+                  <thead className="bg-[#FFF7ED]">
                     <tr>
-                      <th className="px-3 py-3 text-left font-semibold">USN</th>
-                      <th className="px-3 py-3 text-left font-semibold">Name</th>
-                      <th className="px-3 py-3 text-center font-semibold">
+                      <th className="px-3 py-3 text-left font-semibold text-text">Sl #</th>
+                      <th className="px-3 py-3 text-left font-semibold text-text">USN / Candidate Id</th>
+                      <th className="px-3 py-3 text-left font-semibold text-text">Student Name</th>
+                      <th className="px-3 py-3 text-center font-semibold text-text">
+                        Previous Class
+                        <div className="text-[10px] font-normal text-text2">({previousClassDate})</div>
+                      </th>
+                      <th className="px-3 py-3 text-center font-semibold text-text">
                         <div className="flex items-center justify-center gap-2">
-                          <span>Attendance</span>
+                          <span>
+                            Period Number - 3
+                            <div className="text-[10px] font-normal text-text2">
+                              ({selectedTimetable?.slot || "10:50 AM - 11:40 AM"})
+                            </div>
+                          </span>
                           <button
                             onClick={flipMarkAll}
                             disabled={!isClassSelected || isEditLocked}
-                            className={`rounded-full px-3 py-1 text-[11px] font-bold transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-bold transition disabled:cursor-not-allowed disabled:opacity-50 ${
                               markAllStatus === STATUS.PRESENT ? "bg-green-500 text-white" : "bg-red-500 text-white"
                             }`}
                           >
-                            {markAllStatus}
+                            All {markAllStatus}
                           </button>
                         </div>
+                        <div className="mt-1 text-[10px] font-normal text-text2">Mark Present / Absent / NA</div>
                       </th>
-                      <th className="px-3 py-3 text-left font-semibold">Remarks</th>
+                      <th className="px-3 py-3 text-left font-semibold text-text">Remark</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {students.map((student) => {
+                    {filteredStudents.map((student, index) => {
                       const row = rows[student.id] || {};
                       const status = row.status || STATUS.PRESENT;
                       const stats = attendanceStatsMap.get(student.id) || { attended: 0, total: 0, percentage: 0 };
@@ -1138,12 +1500,26 @@ export default function App() {
                       return (
                         <tr
                           key={student.id}
-                          className={`border-t ${
+                          className={`border-t border-border ${
                             status === STATUS.ON_DUTY ? "bg-naSoft" : isLowAttendance ? "bg-red-50" : "bg-white"
                           }`}
                         >
-                          <td className="px-3 py-3">{student.usn}</td>
-                          <td className="px-3 py-3">{student.name}</td>
+                          <td className="px-3 py-3 text-text2">{index + 1}</td>
+                          <td className="px-3 py-3 font-medium text-text">{student.usn}</td>
+                          <td className="px-3 py-3 text-text">{student.name}</td>
+
+                          <td className="px-3 py-3 text-center align-top">
+                            {stats.total > 0 ? (
+                              <div className="text-[11px] text-text2">
+                                <div># of Periods Marked: {stats.total}</div>
+                                <div className={isLowAttendance ? "font-semibold text-red-600" : "text-green-700"}>
+                                  {stats.attended}/{stats.total} ({stats.percentage}%)
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="text-[11px] text-text2">—</span>
+                            )}
+                          </td>
 
                           <td className="px-3 py-3 text-center align-top">
                             <div className="mx-auto inline-flex rounded-full border border-gray-300 p-1">
@@ -1188,79 +1564,126 @@ export default function App() {
                             {row.showOD ? (
                               <div className="mx-auto mt-3 w-full max-w-xs rounded-lg border border-orange-200 bg-orange-50 p-3 text-left">
                                 <p className="mb-2 text-xs font-semibold text-orange-900">OD reason / exception</p>
-                                <div className="mb-2 rounded border border-orange-200 bg-white px-2 py-2 text-xs text-orange-900">
-                                  <div className="font-semibold">Reason: {row.odRequestType || "—"}</div>
-                                  <div className="mt-1 text-orange-800">{row.comment?.trim() || "No reason submitted"}</div>
-                                </div>
-                                <label
-                                  className={`mb-2 inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold text-white ${
-                                    isStudentEditEnabled(student.id) ? "cursor-pointer bg-[#9B2335] hover:opacity-95" : "cursor-not-allowed bg-gray-400"
-                                  }`}
-                                >
-                                  <Upload size={12} /> Choose File
-                                  <input
-                                    type="file"
-                                    className="hidden"
-                                    accept=".pdf,.jpg,.jpeg,.png"
-                                    onChange={(event) =>
-                                      setRows((prev) => ({
-                                        ...prev,
-                                        [student.id]: {
-                                          ...prev[student.id],
-                                          file: event.target.files?.[0] || null,
-                                        },
-                                      }))
-                                    }
-                                    disabled={!isStudentEditEnabled(student.id)}
-                                  />
-                                </label>
+
+                                <input
+                                  type="file"
+                                  className="mb-2 block w-full text-xs file:mr-2 file:rounded file:border-0 file:bg-orange-200 file:px-2 file:py-1 file:text-xs file:font-semibold file:text-orange-900"
+                                  onChange={(event) =>
+                                    setRows((prev) => ({
+                                      ...prev,
+                                      [student.id]: {
+                                        ...prev[student.id],
+                                        file: event.target.files?.[0] || null,
+                                        documentSent: false,
+                                        mentorApproval: "Not Sent",
+                                      },
+                                    }))
+                                  }
+                                  disabled={!isStudentEditEnabled(student.id)}
+                                />
                                 {row.file ? (
-                                  <div className="mb-2 truncate text-xs text-gray-700">Attached: {row.file.name}</div>
-                                ) : null}
+                                  <p className="mb-2 truncate text-[11px] text-orange-800">Selected: {row.file.name}</p>
+                                ) : (
+                                  <p className="mb-2 text-[11px] text-orange-700">No file chosen</p>
+                                )}
+
+                                <input
+                                  type="text"
+                                  value={row.comment || ""}
+                                  onChange={(event) =>
+                                    setRows((prev) => ({
+                                      ...prev,
+                                      [student.id]: {
+                                        ...prev[student.id],
+                                        comment: event.target.value,
+                                      },
+                                    }))
+                                  }
+                                  placeholder="Comment is required"
+                                  className="mb-2 w-full rounded border border-orange-300 px-2 py-1 text-xs"
+                                  disabled={!isStudentEditEnabled(student.id)}
+                                />
+
                                 <div className="mb-2 rounded border border-orange-200 bg-white px-2 py-2 text-xs">
-                                  <div className="mb-1 font-semibold text-orange-900">
-                                    Higher authority verification: {row.odAuthorityStatus || "Not Requested"}
-                                  </div>
-                                  <button
-                                    onClick={() =>
-                                      setRows((prev) => ({
-                                        ...prev,
-                                        [student.id]: {
-                                          ...prev[student.id],
-                                          odAuthorityStatus: "Requested",
-                                        },
-                                      }))
-                                    }
-                                    disabled={!isStudentEditEnabled(student.id)}
-                                    className="rounded border border-orange-300 bg-orange-50 px-2 py-1 text-xs font-semibold text-orange-900 hover:bg-orange-100 disabled:cursor-not-allowed disabled:opacity-50"
-                                  >
-                                    Request Verification
-                                  </button>
-                                </div>
-                                <div className="mb-2 rounded border border-orange-200 bg-white px-2 py-2 text-xs">
-                                  <div className="font-semibold text-orange-900">
-                                    Mentor Approval:{" "}
+                                  <div className="mb-2 font-semibold text-orange-900">
+                                    Mentor approval:{" "}
                                     <span
                                       className={
                                         row.mentorApproval === "Approved"
                                           ? "text-green-700"
                                           : row.mentorApproval === "Rejected"
                                             ? "text-red-700"
-                                            : "text-amber-700"
+                                            : row.mentorApproval === "Approval Pending"
+                                              ? "text-amber-700"
+                                              : "text-gray-600"
                                       }
                                     >
-                                      {row.mentorApproval || "Pending"}
+                                      {row.mentorApproval || "Not Sent"}
                                     </span>
                                   </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => sendODDocument(student.id)}
+                                    disabled={
+                                      !isStudentEditEnabled(student.id) ||
+                                      !row.file ||
+                                      row.documentSent
+                                    }
+                                    className="rounded border border-orange-400 bg-orange-100 px-2 py-1 text-xs font-semibold text-orange-900 hover:bg-orange-200 disabled:cursor-not-allowed disabled:opacity-50"
+                                  >
+                                    {row.documentSent ? "Document Sent" : "Send Document to Mentor"}
+                                  </button>
+                                  {row.documentSent && row.mentorApproval === "Approval Pending" ? (
+                                    <p className="mt-2 text-[10px] text-amber-800">
+                                      Waiting for mentor review. Demo: simulate mentor response below.
+                                    </p>
+                                  ) : null}
+                                  {row.documentSent && row.mentorApproval === "Approval Pending" ? (
+                                    <div className="mt-2 flex gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          setRows((prev) => ({
+                                            ...prev,
+                                            [student.id]: {
+                                              ...prev[student.id],
+                                              mentorApproval: "Approved",
+                                            },
+                                          }))
+                                        }
+                                        className="rounded border border-green-300 px-2 py-1 text-xs text-green-800 hover:bg-green-50"
+                                      >
+                                        Approve
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          setRows((prev) => ({
+                                            ...prev,
+                                            [student.id]: {
+                                              ...prev[student.id],
+                                              mentorApproval: "Rejected",
+                                            },
+                                          }))
+                                        }
+                                        className="rounded border border-red-300 px-2 py-1 text-xs text-red-800 hover:bg-red-50"
+                                      >
+                                        Reject
+                                      </button>
+                                    </div>
+                                  ) : null}
                                 </div>
+
                                 <div className="flex justify-between gap-2">
                                   <button
+                                    type="button"
                                     onClick={() => saveOD(student.id)}
                                     className="inline-flex items-center gap-1 rounded bg-na px-2 py-1 text-xs font-semibold maroon"
                                   >
                                     <Save size={12} /> Save
                                   </button>
                                   <button
+                                    type="button"
                                     onClick={() => exitOD(student.id)}
                                     className="rounded border border-gray-300 px-2 py-1 text-xs"
                                   >
@@ -1278,17 +1701,32 @@ export default function App() {
                                   <span className={`rounded-full px-2 py-1 text-xs font-semibold ${statusPillClass(status)}`}>
                                     OD
                                   </span>
-                                  <span className="text-xs text-gray-700">
-                                    {row.odRequestType || "—"} — {row.comment?.trim() || "No reason"}
-                                  </span>
+                                  <input
+                                    type="text"
+                                    value={row.comment || ""}
+                                    onChange={(event) =>
+                                      setRows((prev) => ({
+                                        ...prev,
+                                        [student.id]: {
+                                          ...prev[student.id],
+                                          comment: event.target.value,
+                                        },
+                                      }))
+                                    }
+                                    placeholder="Add comment"
+                                    className="w-full rounded border border-gray-300 px-2 py-1 text-xs"
+                                    disabled={!isStudentEditEnabled(student.id)}
+                                  />
                                   {row.file ? (
-                                    <span className="max-w-full truncate text-xs text-gray-600">File: {row.file.name}</span>
+                                    <span className="max-w-full truncate text-xs text-gray-700">
+                                      File: {row.file.name}
+                                    </span>
                                   ) : (
-                                    <span className="text-xs text-gray-400">No attachment</span>
+                                    <span className="text-xs text-gray-400">Attachment: none</span>
                                   )}
                                   <span className="text-xs text-gray-600">
-                                    Verification: {row.odAuthorityStatus || "Not Requested"} · Mentor:{" "}
-                                    {row.mentorApproval || "Pending"}
+                                    Document: {row.documentSent ? "Sent" : "Not sent"} | Mentor:{" "}
+                                    {row.mentorApproval || "Not Sent"}
                                   </span>
                                 </>
                               ) : (
@@ -1296,11 +1734,22 @@ export default function App() {
                                   <span className={`rounded-full px-2 py-1 text-xs font-semibold ${statusPillClass(status)}`}>
                                     {status === STATUS.PRESENT ? "Present" : "Absent"}
                                   </span>
-                                  {row.comment?.trim() ? (
-                                    <span className="text-xs text-gray-600">{row.comment}</span>
-                                  ) : (
-                                    <span className="text-xs text-gray-400">No remarks</span>
-                                  )}
+                                  <input
+                                    type="text"
+                                    value={row.comment || ""}
+                                    onChange={(event) =>
+                                      setRows((prev) => ({
+                                        ...prev,
+                                        [student.id]: {
+                                          ...prev[student.id],
+                                          comment: event.target.value,
+                                        },
+                                      }))
+                                    }
+                                    placeholder="Add remarks"
+                                    className="w-full rounded border border-gray-300 px-2 py-1 text-xs"
+                                    disabled={!isStudentEditEnabled(student.id)}
+                                  />
                                 </>
                               )}
                             </div>
@@ -1351,9 +1800,8 @@ export default function App() {
                 <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-green-800">Attendance status: Submitted</div>
               </div>
             ) : null}
-          </div>
-        )}
-      </div>
-    </div>
+        </div>
+      )}
+    </main>
   );
-} 
+}

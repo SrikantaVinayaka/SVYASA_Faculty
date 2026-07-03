@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import { Calendar, Search, X } from "lucide-react";
 
 // Static data from screenshots
 const COURSE_INFO = {
@@ -112,7 +113,11 @@ function PctBadge({ pct }) {
 export default function AttendanceView() {
   const [dates, setDates] = useState(DATES);
   const [totalPeriods, setTotalPeriods] = useState(COURSE_INFO.totalPeriods);
-  const [viewFilter, setViewFilter] = useState("monthly"); // "weekly", "monthly", "semester"
+  const [viewFilter, setViewFilter] = useState("monthly");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedMonth, setSelectedMonth] = useState("2026-03");
+  const [selectedWeekIndex, setSelectedWeekIndex] = useState(0);
+  const [showCalendar, setShowCalendar] = useState(false);
 
   const TOTAL = totalPeriods;
 
@@ -218,28 +223,38 @@ export default function AttendanceView() {
     return grouped;
   };
 
+  const weeklyGroups = useMemo(() => getWeeklyDates(dates), [dates]);
+
   const visibleDateIndices = useMemo(() => {
     if (!dates.length) return [];
 
     if (viewFilter === "weekly") {
-      const start = Math.max(0, dates.length - 7);
-      return dates.slice(start).map((_, idx) => start + idx);
+      const weekDates = weeklyGroups[selectedWeekIndex]?.dates || weeklyGroups[weeklyGroups.length - 1]?.dates || [];
+      const weekIds = new Set(weekDates.map((date) => date.id));
+      return dates.map((date, idx) => (weekIds.has(date.id) ? idx : -1)).filter((idx) => idx >= 0);
     }
 
     if (viewFilter === "monthly") {
-      const lastDate = parseLabelToDate(dates[dates.length - 1].label);
-      if (!lastDate) return dates.map((_, idx) => idx);
+      const [yearText, monthText] = selectedMonth.split("-");
+      const year = Number(yearText);
+      const month = Number(monthText) - 1;
 
       return dates
         .map((date, idx) => ({ date: parseLabelToDate(date.label), idx }))
-        .filter(({ date }) => date && date.getMonth() === lastDate.getMonth() && date.getFullYear() === lastDate.getFullYear())
+        .filter(({ date }) => date && date.getMonth() === month && date.getFullYear() === year)
         .map(({ idx }) => idx);
     }
 
     return dates.map((_, idx) => idx);
-  }, [dates, viewFilter]);
+  }, [dates, viewFilter, selectedMonth, selectedWeekIndex, weeklyGroups]);
 
   const visibleDates = useMemo(() => visibleDateIndices.map((index) => dates[index]), [dates, visibleDateIndices]);
+
+  useEffect(() => {
+    if (viewFilter === "weekly" && selectedWeekIndex >= weeklyGroups.length) {
+      setSelectedWeekIndex(Math.max(0, weeklyGroups.length - 1));
+    }
+  }, [viewFilter, selectedWeekIndex, weeklyGroups.length]);
 
   useEffect(() => {
     if (!editColId) return;
@@ -252,13 +267,57 @@ export default function AttendanceView() {
 
   const getFilteredDatesDisplay = () => {
     if (viewFilter === "weekly") {
-      return getWeeklyDates(visibleDates);
-    } else if (viewFilter === "semester") {
-      return getSemesterDates(visibleDates);
-    } else {
-      return getMonthlyDates(visibleDates);
+      return weeklyGroups;
     }
+    return getMonthlyDates(visibleDates);
   };
+
+  const filteredStudents = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return STUDENTS_RAW;
+    return STUDENTS_RAW.filter(
+      (student) =>
+        student.name.toLowerCase().includes(query) || student.usn.toLowerCase().includes(query)
+    );
+  }, [searchQuery]);
+
+  const calendarDays = useMemo(() => {
+    const [yearText, monthText] = selectedMonth.split("-");
+    const year = Number(yearText);
+    const month = Number(monthText) - 1;
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const firstDay = new Date(year, month, 1).getDay();
+
+    return Array.from({ length: firstDay + daysInMonth }, (_, index) => {
+      if (index < firstDay) return { empty: true, key: `empty-${index}` };
+      const day = index - firstDay + 1;
+      const labelPrefix = `${day} ${new Date(year, month, day).toLocaleString("en-US", { month: "short" })}`;
+      const dateEntry = dates.find((entry) => entry.label === labelPrefix);
+      const dateIndex = dateEntry ? dates.findIndex((entry) => entry.id === dateEntry.id) : -1;
+      let presentCount = 0;
+      let totalMarked = 0;
+
+      if (dateIndex >= 0) {
+        STUDENTS_RAW.forEach((student) => {
+          const value = attendance[student.id]?.[dateIndex];
+          if (value !== undefined) {
+            totalMarked += 1;
+            if (value) presentCount += 1;
+          }
+        });
+      }
+
+      return {
+        empty: false,
+        key: `day-${day}`,
+        day,
+        hasAttendance: dateIndex >= 0,
+        presentCount,
+        absentCount: totalMarked - presentCount,
+        label: labelPrefix,
+      };
+    });
+  }, [selectedMonth, dates, attendance]);
 
   const cloneAttendance = (source) => {
     const cloned = {};
@@ -468,8 +527,8 @@ export default function AttendanceView() {
     [attendance, visibleDateIndices]
   );
 
-  const below75 = STUDENTS_RAW.filter((s) => studentStats[s.id]?.pct < 75).length;
-  const above75 = STUDENTS_RAW.length - below75;
+  const below75 = filteredStudents.filter((s) => studentStats[s.id]?.pct < 75).length;
+  const above75 = filteredStudents.length - below75;
 
   const hasRowPendingChanges = (studentId) => {
     if (!editSnapshot || editSnapshot.mode !== "row" || editSnapshot.targetId !== studentId) {
@@ -547,6 +606,46 @@ export default function AttendanceView() {
         </div>
 
         <div style={{ display: "flex", gap: 16, fontSize: 11, color: "#6b7280", flexWrap: "wrap", alignItems: "center", marginTop: 10 }}>
+          <div style={{ position: "relative", minWidth: 220, flex: "1 1 220px" }}>
+            <Search size={14} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "#9ca3af" }} />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Search by Name or USN"
+              style={{
+                width: "100%",
+                padding: "8px 10px 8px 32px",
+                borderRadius: 8,
+                border: "1px solid #d1d5db",
+                fontSize: 12,
+                background: "#fff",
+              }}
+            />
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowCalendar(true)}
+            title="Calendar view"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "8px 12px",
+              borderRadius: 8,
+              border: "1px solid #d1d5db",
+              background: "#fff",
+              fontSize: 12,
+              fontWeight: 600,
+              color: "#374151",
+              cursor: "pointer",
+            }}
+          >
+            <Calendar size={15} />
+            Calendar
+          </button>
+
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <label style={{ fontSize: 12, fontWeight: 600, color: "#374151" }}>View:</label>
             <select
@@ -561,14 +660,53 @@ export default function AttendanceView() {
                 backgroundColor: "#fff",
                 color: "#374151",
                 cursor: "pointer",
-                transition: "border-color 0.2s",
               }}
             >
               <option value="monthly">Monthly</option>
               <option value="weekly">Weekly</option>
-              <option value="semester">Semester</option>
             </select>
           </div>
+
+          {viewFilter === "monthly" ? (
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "#374151" }}>Month:</label>
+              <input
+                type="month"
+                value={selectedMonth}
+                onChange={(event) => setSelectedMonth(event.target.value)}
+                style={{
+                  padding: "6px 10px",
+                  borderRadius: 6,
+                  border: "1px solid #d1d5db",
+                  fontSize: 12,
+                  backgroundColor: "#fff",
+                }}
+              />
+            </div>
+          ) : null}
+
+          {viewFilter === "weekly" ? (
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "#374151" }}>Week:</label>
+              <select
+                value={selectedWeekIndex}
+                onChange={(event) => setSelectedWeekIndex(Number(event.target.value))}
+                style={{
+                  padding: "6px 10px",
+                  borderRadius: 6,
+                  border: "1px solid #d1d5db",
+                  fontSize: 12,
+                  backgroundColor: "#fff",
+                }}
+              >
+                {weeklyGroups.map((group, index) => (
+                  <option key={group.label} value={index}>
+                    {group.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
         </div>
 
         <div style={{ display: "flex", gap: 16, fontSize: 11, color: "#6b7280", flexWrap: "wrap", alignItems: "center" }}>
@@ -673,7 +811,7 @@ export default function AttendanceView() {
         }}
       >
         {/* Date Grouping Display */}
-        {viewFilter !== "monthly" && (
+        {viewFilter === "weekly" && (
           <div style={{ padding: "12px 16px", borderBottom: "1px solid #e5e7eb", background: "#f9fafb", overflowX: "auto" }}>
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap", fontSize: 11 }}>
               {getFilteredDatesDisplay().map((group, idx) => (
@@ -883,7 +1021,14 @@ export default function AttendanceView() {
           </thead>
 
           <tbody>
-            {STUDENTS_RAW.map((s, sIdx) => {
+            {filteredStudents.length === 0 ? (
+              <tr>
+                <td colSpan={visibleDates.length + 5} style={{ ...TD, padding: 24, textAlign: "center", color: "#6b7280" }}>
+                  No students match your search.
+                </td>
+              </tr>
+            ) : null}
+            {filteredStudents.map((s, sIdx) => {
               const stats = studentStats[s.id];
               const isRowActive = editRowId === s.id;
               const rowHasChanges = hasRowPendingChanges(s.id);
@@ -1127,8 +1272,8 @@ export default function AttendanceView() {
 
       <div style={{ display: "flex", gap: 10, marginTop: 14, flexWrap: "wrap" }}>
         {[
-          { label: "Total Students", value: STUDENTS_RAW.length, color: "#0f766e", bg: "#ccfbf1" },
-          { label: "Total Classes", value: TOTAL, color: "#065f46", bg: "#ecfdf5" },
+          { label: searchQuery ? "Matching Students" : "Total Students", value: filteredStudents.length, color: "#0f766e", bg: "#ccfbf1" },
+          { label: "Total Classes", value: visibleDates.length || TOTAL, color: "#065f46", bg: "#ecfdf5" },
           { label: "Below 75%", value: below75, color: "#991b1b", bg: "#fef2f2" },
           { label: "At / Above 75%", value: above75, color: "#065f46", bg: "#ecfdf5" },
         ].map((c) => (
@@ -1148,7 +1293,100 @@ export default function AttendanceView() {
         ))}
       </div>
 
-    
+      {showCalendar ? (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.35)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 50,
+            padding: 16,
+          }}
+          onClick={() => setShowCalendar(false)}
+        >
+          <div
+            style={{
+              background: "#fff",
+              borderRadius: 12,
+              width: "100%",
+              maxWidth: 420,
+              boxShadow: "0 10px 40px rgba(0,0,0,0.15)",
+              overflow: "hidden",
+            }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", borderBottom: "1px solid #e5e7eb" }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#1f2937" }}>Calendar View</h3>
+                <p style={{ margin: "4px 0 0", fontSize: 12, color: "#6b7280" }}>Attendance summary by date</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCalendar(false)}
+                style={{ border: "none", background: "transparent", cursor: "pointer", color: "#6b7280" }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div style={{ padding: 16 }}>
+              <input
+                type="month"
+                value={selectedMonth}
+                onChange={(event) => setSelectedMonth(event.target.value)}
+                style={{
+                  width: "100%",
+                  marginBottom: 12,
+                  padding: "8px 10px",
+                  borderRadius: 8,
+                  border: "1px solid #d1d5db",
+                  fontSize: 12,
+                }}
+              />
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 6, marginBottom: 8 }}>
+                {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((day) => (
+                  <div key={day} style={{ textAlign: "center", fontSize: 10, fontWeight: 700, color: "#9ca3af" }}>
+                    {day}
+                  </div>
+                ))}
+                {calendarDays.map((entry) =>
+                  entry.empty ? (
+                    <div key={entry.key} />
+                  ) : (
+                    <div
+                      key={entry.key}
+                      style={{
+                        minHeight: 52,
+                        borderRadius: 8,
+                        border: entry.hasAttendance ? "1px solid #99f6e4" : "1px solid #f3f4f6",
+                        background: entry.hasAttendance ? "#f0fdfa" : "#fafafa",
+                        padding: 4,
+                        textAlign: "center",
+                      }}
+                    >
+                      <div style={{ fontSize: 11, fontWeight: 700, color: "#374151" }}>{entry.day}</div>
+                      {entry.hasAttendance ? (
+                        <>
+                          <div style={{ fontSize: 9, color: "#0f766e", fontWeight: 700 }}>P {entry.presentCount}</div>
+                          <div style={{ fontSize: 9, color: "#b91c1c", fontWeight: 700 }}>A {entry.absentCount}</div>
+                        </>
+                      ) : (
+                        <div style={{ fontSize: 9, color: "#d1d5db" }}>—</div>
+                      )}
+                    </div>
+                  )
+                )}
+              </div>
+              <p style={{ fontSize: 11, color: "#6b7280", margin: 0 }}>
+                Green dates have marked attendance. P = present count, A = absent count for that session.
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
     </div>
   );
 }

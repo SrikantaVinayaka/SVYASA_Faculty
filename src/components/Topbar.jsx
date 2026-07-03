@@ -13,7 +13,7 @@ const NAVIGATION_ITEMS = [
   { id: "lessonplan", child: "Create Plan", label: "Create Plan", keywords: ["lesson plan", "create plan"] },
   { id: "lessonplan", child: "View Plans", label: "View Plans", keywords: ["view plans"] },
   { id: "lessonplan", child: "CO-PO Mapping", label: "CO-PO Mapping", keywords: ["co-po", "mapping"] },
-  { id: "assessment", child: "Internal Assessment", label: "Internal Assessment", keywords: ["ia mean", "assessment mean", "internal assessment"] },
+  { id: "assessment", child: "Internal assessment", label: "Internal assessment", keywords: ["internal assessment", "assessment mean", "internal assessment"] },
   { id: "assessment", child: "Marks Scored", label: "Marks Scored", keywords: ["marks scored", "marks"] },
   { id: "assessment", child: "Other Assessment", label: "Other Assessment", keywords: ["other assessment"] },
   { id: "mentoring", child: "My Mentees", label: "My Mentees", keywords: ["mentoring", "mentees"] },
@@ -118,7 +118,7 @@ export default function Topbar({ breadcrumb = "My Dashboard", onLogout, onNaviga
           className="rounded-full border border-border bg-page-bg px-2 py-1 text-[12px] text-text2 hover:bg-white"
           onClick={() => onNavigate?.("profile")}
         >
-          Dr Dr. Bharathi [ FACULTY ]
+          Dr. Bharathi [ FACULTY ]
         </button>
       </div>
 
@@ -236,8 +236,8 @@ export default function Topbar({ breadcrumb = "My Dashboard", onLogout, onNaviga
                   <UserCircle size={28} />
                 </div>
                 <div>
-                  <p className="text-[13px] font-bold text-text">Dr Dr. Bharathi</p>
-                  <p className="text-[12px] text-text2">dr.bharathi</p>
+                  <p className="text-[13px] font-bold text-text">Dr. Bharathi</p>
+                  <p className="text-[12px] text-text2">Dr.bharathi</p>
                   <p className="text-[11px] text-text2">Data Science & Big Data Analytics</p>
                 </div>
               </div>
