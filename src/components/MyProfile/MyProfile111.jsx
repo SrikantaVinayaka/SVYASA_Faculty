@@ -28,7 +28,6 @@ const PROFESSIONAL_LINKS = [
   { label: "Training Details", icon: "📒" },
   { label: "Competitive Exam", icon: "📄" },
   { label: "Career Details", icon: "💼" },
-  { label: "Official Registration", icon: "🖥️" },
   { label: "Refresher Course", icon: "📖" },
 ];
 
@@ -55,7 +54,6 @@ const PROFESSIONAL_SECTIONS = [
   { id: "training-details", label: "Training Details", icon: "📒" },
   { id: "competitive-exam", label: "Competitive Exam", icon: "📄" },
   { id: "career-details", label: "Career Details", icon: "💼" },
-  { id: "official-registration", label: "Official Registration", icon: "🖥️" },
   { id: "refresher-course", label: "Refresher Course", icon: "📖" },
 ];
 
@@ -154,6 +152,32 @@ const btnDanger = {
   borderRadius: "8px",
   cursor: "pointer",
 };
+
+/* ─── SHARED HELPER COMPONENTS ───────────────────────── */
+/* Defined at module level so their identity is stable across renders.
+   Defining them inside a component function creates a new reference on
+   every render, which causes React to unmount/remount those subtrees
+   (destroying input focus) on every keystroke. */
+function Field({ label, children }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+      <label style={labelStyle}>{label}</label>
+      {children}
+    </div>
+  );
+}
+
+function MetaRow({ icon, label, value }) {
+  return (
+    <div style={{ display: "flex", alignItems: "flex-start", gap: "7px" }}>
+      <span style={{ fontSize: "13px", marginTop: "1px" }}>{icon}</span>
+      <div style={{ minWidth: 0 }}>
+        <span style={{ fontSize: "11px", fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}: </span>
+        <span style={{ fontSize: "13px", color: "#334155" }}>{value}</span>
+      </div>
+    </div>
+  );
+}
 
 /* ─── EDIT PROFILE MODAL ─────────────────────────────── */
 function EditProfileModal({ profileData, onSave, onCancel }) {
@@ -286,6 +310,165 @@ function ProfileSummarySection() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+/* ─── EDUCATION SECTION ──────────────────────────────── */
+const EMPTY_EDUCATION = {
+  collegeUniversity: "", instituteName: "", courseName: "", specialization: "",
+  yearOfStart: "", yearOfCompletion: "",
+};
+
+function educationYearScore(rec) {
+  const completion = parseInt(rec.yearOfCompletion, 10);
+  if (!isNaN(completion)) return completion;
+  const start = parseInt(rec.yearOfStart, 10);
+  if (!isNaN(start)) return start;
+  return 0;
+}
+
+function EducationSection() {
+  const [records, setRecords]   = useState([]);
+  const [showForm, setShowForm] = useState(false);
+  const [editIdx, setEditIdx]   = useState(null);
+  const [draft, setDraft]       = useState({ ...EMPTY_EDUCATION });
+
+  const openAdd  = ()  => { setDraft({ ...EMPTY_EDUCATION }); setEditIdx(null); setShowForm(true); };
+  const openEdit = (i) => { setDraft({ ...EMPTY_EDUCATION, ...records[i] }); setEditIdx(i); setShowForm(true); };
+  const cancel   = ()  => setShowForm(false);
+  const reset    = ()  => setDraft({ ...EMPTY_EDUCATION });
+  const del      = (i) => setRecords(prev => prev.filter((_, idx) => idx !== i));
+
+  const save = () => {
+    if (!draft.collegeUniversity.trim() || !draft.instituteName.trim() || !draft.courseName.trim()
+        || !draft.yearOfStart.trim() || !draft.yearOfCompletion.trim()) {
+      alert("Please fill in College / University Name, Institute Name, Course Name, Year of Start, and Year of Completion.");
+      return;
+    }
+    setRecords(prev =>
+      editIdx !== null
+        ? prev.map((r, i) => i === editIdx ? { ...draft } : r)
+        : [...prev, { ...draft }]
+    );
+    setShowForm(false);
+  };
+
+  // Display most recent first (by Year of Completion), but keep edit/delete bound to the true index in `records`.
+  const sortedRecords = records
+    .map((rec, i) => ({ rec, i }))
+    .sort((a, b) => educationYearScore(b.rec) - educationYearScore(a.rec));
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+
+      {/* ── RECORDS ── */}
+      {sortedRecords.map(({ rec, i }) => (
+        <div key={i} className="info-card" style={{
+          background: "#fff", border: "1px solid #e2e8f0", borderRadius: "16px",
+          overflow: "hidden", boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+        }}>
+          {/* Card header strip */}
+          <div style={{ background: BRAND_LIGHT, padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", flexWrap: "wrap" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", flex: 1, minWidth: 0 }}>
+              <div style={{ width: 38, height: 38, borderRadius: "10px", background: BRAND, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "17px", flexShrink: 0 }}>🎓</div>
+              <div style={{ minWidth: 0 }}>
+                <p style={{ fontWeight: 700, fontSize: "14px", color: "#1e293b", margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {rec.courseName || "—"}
+                </p>
+                <p style={{ fontSize: "12px", color: "#475569", margin: "1px 0 0" }}>{rec.collegeUniversity || "—"}</p>
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
+              <button onClick={() => openEdit(i)} style={{ ...btnOutline, padding: "5px 12px", fontSize: "12px" }}>✏️ Edit</button>
+              <button onClick={() => del(i)} style={btnDanger}>🗑 Delete</button>
+            </div>
+          </div>
+
+          {/* Card body */}
+          <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: "8px" }}>
+            <MetaRow icon="🏫" label="Institute Name" value={rec.instituteName || "—"} />
+            {rec.specialization && (
+              <MetaRow icon="🎯" label="Specialization" value={rec.specialization} />
+            )}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+              <MetaRow icon="📅" label="Year of Start" value={rec.yearOfStart || "—"} />
+              <MetaRow icon="🏁" label="Year of Completion" value={rec.yearOfCompletion || "—"} />
+            </div>
+          </div>
+        </div>
+      ))}
+
+      {/* ── EMPTY STATE ── */}
+      {records.length === 0 && !showForm && (
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "12px", padding: "20px 0" }}>
+          <div style={{ fontSize: "36px", opacity: 0.25 }}>🎓</div>
+          <p style={{ fontSize: "13px", color: "#94a3b8", fontStyle: "italic", margin: 0 }}>No information added yet.</p>
+        </div>
+      )}
+
+      {/* ── FORM ── */}
+      {showForm && (
+        <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "16px", padding: "20px", display: "flex", flexDirection: "column", gap: "14px" }}>
+          {/* Form title */}
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", paddingBottom: "10px", borderBottom: "1px solid #e2e8f0" }}>
+            <div style={{ width: 30, height: 30, borderRadius: "8px", background: BRAND_LIGHT, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "15px" }}>🎓</div>
+            <p style={{ fontSize: "13px", fontWeight: 700, color: BRAND, textTransform: "uppercase", letterSpacing: "0.07em", margin: 0 }}>
+              {editIdx !== null ? "Edit Education" : "Add Education"}
+            </p>
+          </div>
+
+          {/* Row 1: College/University + Institute Name */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+            <Field label="College / University Name *">
+              <input type="text" value={draft.collegeUniversity} placeholder="e.g. SVYASA University"
+                onChange={e => setDraft(p => ({ ...p, collegeUniversity: e.target.value }))} style={inputStyle} />
+            </Field>
+            <Field label="Institute Name *">
+              <input type="text" value={draft.instituteName} placeholder="e.g. School of Engineering"
+                onChange={e => setDraft(p => ({ ...p, instituteName: e.target.value }))} style={inputStyle} />
+            </Field>
+          </div>
+
+          {/* Row 2: Course Name + Specialization */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+            <Field label="Course Name *">
+              <input type="text" value={draft.courseName} placeholder="e.g. BCA, MCA, B.Tech, M.Tech, MBA"
+                onChange={e => setDraft(p => ({ ...p, courseName: e.target.value }))} style={inputStyle} />
+            </Field>
+            <Field label="Specialization (Optional)">
+              <input type="text" value={draft.specialization} placeholder="e.g. Computer Science, AI, Data Science"
+                onChange={e => setDraft(p => ({ ...p, specialization: e.target.value }))} style={inputStyle} />
+            </Field>
+          </div>
+
+          {/* Row 3: Year of Start + Year of Completion */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+            <Field label="Year of Start *">
+              <input type="number" value={draft.yearOfStart} placeholder="e.g. 2018" min="1950" max="2099"
+                onChange={e => setDraft(p => ({ ...p, yearOfStart: e.target.value }))} style={inputStyle} />
+            </Field>
+            <Field label="Year of Completion *">
+              <input type="number" value={draft.yearOfCompletion} placeholder="e.g. 2022" min="1950" max="2099"
+                onChange={e => setDraft(p => ({ ...p, yearOfCompletion: e.target.value }))} style={inputStyle} />
+            </Field>
+          </div>
+
+          {/* Actions */}
+          <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end", paddingTop: "4px" }}>
+            <button onClick={cancel} style={btnGhost}>Cancel</button>
+            <button onClick={reset}  style={btnOutline}>Reset</button>
+            <button onClick={save}   style={btnPrimary}>Save</button>
+          </div>
+        </div>
+      )}
+
+      {/* ── ADD BUTTON ── */}
+      {!showForm && (
+        <div>
+          <button onClick={openAdd} style={btnPrimary}>+ Add Education</button>
+        </div>
+      )}
     </div>
   );
 }
@@ -469,25 +652,6 @@ function WorkExperienceSection() {
     const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
     return `${months[parseInt(m, 10) - 1]} ${y}`;
   };
-
-  /* ── card meta rows helper ── */
-  const MetaRow = ({ icon, label, value }) => (
-    <div style={{ display: "flex", alignItems: "flex-start", gap: "7px" }}>
-      <span style={{ fontSize: "13px", marginTop: "1px" }}>{icon}</span>
-      <div>
-        <span style={{ fontSize: "11px", fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}: </span>
-        <span style={{ fontSize: "13px", color: "#334155" }}>{value}</span>
-      </div>
-    </div>
-  );
-
-  /* ── field wrapper ── */
-  const Field = ({ label, children }) => (
-    <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-      <label style={labelStyle}>{label}</label>
-      {children}
-    </div>
-  );
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
@@ -791,7 +955,7 @@ function TechnicalSkillsSection() {
               onKeyDown={handleKeyDown}
               style={{ ...inputStyle, flex: 1 }}
             />
-            <button onClick={addChip} style={{ ...btnPrimary, whiteSpace: "nowrap" }}>+ Add</button>
+            <button type="button" onClick={addChip} style={{ ...btnPrimary, whiteSpace: "nowrap" }}>+ Add</button>
           </div>
           {/* Draft chips */}
           {draftSkills.length > 0 && (
@@ -799,7 +963,7 @@ function TechnicalSkillsSection() {
               {draftSkills.map(skill => (
                 <span key={skill} style={{ ...chipStyle(), paddingRight: "8px" }}>
                   {skill}
-                  <button onClick={() => removeChip(skill)}
+                  <button type="button" onClick={() => removeChip(skill)}
                     style={{ background: "none", border: "none", cursor: "pointer", color: BRAND, fontSize: "13px", lineHeight: 1, padding: 0, marginLeft: "2px" }}>
                     ×
                   </button>
@@ -825,6 +989,148 @@ function TechnicalSkillsSection() {
         </div>
       )}
       {!showForm && saved && null /* edit/delete already shown inside card */}
+    </div>
+  );
+}
+
+/* ─── HOBBIES SECTION ────────────────────────────────── */
+function HobbiesSection() {
+  const [saved, setSaved]             = useState(null);   // null = no record yet; array = saved hobbies
+  const [showForm, setShowForm]       = useState(false);
+  const [inputVal, setInputVal]       = useState("");
+  const [draftHobbies, setDraftHobbies] = useState([]);
+
+  const openAdd = () => {
+    setDraftHobbies([]);
+    setInputVal("");
+    setShowForm(true);
+  };
+
+  const openEdit = () => {
+    setDraftHobbies([...(saved || [])]);
+    setInputVal("");
+    setShowForm(true);
+  };
+
+  const cancel = () => setShowForm(false);
+
+  const reset = () => {
+    setDraftHobbies([]);
+    setInputVal("");
+  };
+
+  const addChip = () => {
+    const v = inputVal.trim();
+    if (v && !draftHobbies.some(h => h.toLowerCase() === v.toLowerCase())) {
+      setDraftHobbies(prev => [...prev, v]);
+    }
+    setInputVal("");
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter") { e.preventDefault(); addChip(); }
+  };
+
+  const removeChip = (hobby) => setDraftHobbies(prev => prev.filter(h => h !== hobby));
+
+  const save = () => {
+    setSaved([...draftHobbies]);
+    setShowForm(false);
+  };
+
+  const del = () => {
+    setSaved(null);
+    setShowForm(false);
+  };
+
+  const chipStyle = (color = BRAND, bg = BRAND_LIGHT) => ({
+    display: "inline-flex", alignItems: "center", gap: "6px",
+    padding: "5px 12px", borderRadius: "999px",
+    fontSize: "12px", fontWeight: 600,
+    background: bg, color: color,
+    border: `1px solid ${color}22`,
+  });
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+
+      {/* Saved hobbies view */}
+      {saved && !showForm && (
+        <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "14px", padding: "16px" }}>
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px", marginBottom: "12px" }}>
+            <p style={{ fontSize: "11px", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.07em", margin: 0 }}>Hobbies</p>
+            <div style={{ display: "flex", gap: "6px" }}>
+              <button onClick={openEdit} style={{ ...btnOutline, padding: "5px 12px", fontSize: "12px" }}>✏️ Edit</button>
+              <button onClick={del} style={btnDanger}>🗑 Delete</button>
+            </div>
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+            {saved.map(hobby => (
+              <span key={hobby} style={chipStyle()}>{hobby}</span>
+            ))}
+            {saved.length === 0 && (
+              <span style={{ fontSize: "13px", color: "#94a3b8", fontStyle: "italic" }}>No hobbies added.</span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Empty state */}
+      {!saved && !showForm && (
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "12px", padding: "20px 0" }}>
+          <p style={{ fontSize: "13px", color: "#94a3b8", fontStyle: "italic" }}>No information added yet.</p>
+        </div>
+      )}
+
+      {/* Form */}
+      {showForm && (
+        <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "14px", padding: "18px", display: "flex", flexDirection: "column", gap: "14px" }}>
+          <p style={{ fontSize: "11px", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.07em", margin: 0 }}>
+            {saved ? "Edit Hobbies" : "Add Hobbies"}
+          </p>
+          {/* Input + Add inline */}
+          <div style={{ display: "flex", gap: "8px" }}>
+            <input
+              type="text"
+              value={inputVal}
+              placeholder="e.g. Reading, Photography, Gardening…"
+              onChange={e => setInputVal(e.target.value)}
+              onKeyDown={handleKeyDown}
+              style={{ ...inputStyle, flex: 1 }}
+            />
+            <button type="button" onClick={addChip} style={{ ...btnPrimary, whiteSpace: "nowrap" }}>+ Add</button>
+          </div>
+          {/* Draft chips */}
+          {draftHobbies.length > 0 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+              {draftHobbies.map(hobby => (
+                <span key={hobby} style={{ ...chipStyle(), paddingRight: "8px" }}>
+                  {hobby}
+                  <button type="button" onClick={() => removeChip(hobby)}
+                    style={{ background: "none", border: "none", cursor: "pointer", color: BRAND, fontSize: "13px", lineHeight: 1, padding: 0, marginLeft: "2px" }}>
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+          {draftHobbies.length === 0 && (
+            <p style={{ fontSize: "12px", color: "#cbd5e1", fontStyle: "italic", margin: 0 }}>Type a hobby and press Enter or click Add.</p>
+          )}
+          <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
+            <button onClick={cancel} style={btnGhost}>Cancel</button>
+            <button onClick={reset}  style={btnOutline}>Reset</button>
+            <button onClick={save}   style={btnPrimary}>Save</button>
+          </div>
+        </div>
+      )}
+
+      {/* Add button */}
+      {!showForm && !saved && (
+        <div>
+          <button onClick={openAdd} style={btnPrimary}>+ Add Hobby</button>
+        </div>
+      )}
     </div>
   );
 }
@@ -919,23 +1225,6 @@ function FundingProjectsSection() {
     const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
     return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
   };
-
-  const Field = ({ label, children }) => (
-    <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-      <label style={labelStyle}>{label}</label>
-      {children}
-    </div>
-  );
-
-  const MetaRow = ({ icon, label, value }) => (
-    <div style={{ display: "flex", alignItems: "flex-start", gap: "7px" }}>
-      <span style={{ fontSize: "13px", marginTop: "1px" }}>{icon}</span>
-      <div>
-        <span style={{ fontSize: "11px", fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}: </span>
-        <span style={{ fontSize: "13px", color: "#334155" }}>{value}</span>
-      </div>
-    </div>
-  );
 
   /* ── Step indicator ── */
   const StepIndicator = () => (
@@ -1391,23 +1680,6 @@ function PatentsSection() {
     return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
   };
 
-  const Field = ({ label, children }) => (
-    <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-      <label style={labelStyle}>{label}</label>
-      {children}
-    </div>
-  );
-
-  const MetaRow = ({ icon, label, value }) => (
-    <div style={{ display: "flex", alignItems: "flex-start", gap: "7px" }}>
-      <span style={{ fontSize: "13px", marginTop: "1px" }}>{icon}</span>
-      <div style={{ minWidth: 0 }}>
-        <span style={{ fontSize: "11px", fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}: </span>
-        <span style={{ fontSize: "13px", color: "#334155" }}>{value}</span>
-      </div>
-    </div>
-  );
-
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
 
@@ -1569,14 +1841,491 @@ function PatentsSection() {
   );
 }
 
+/* ─── CERTIFICATIONS SECTION ─────────────────────────── */
+const EMPTY_CERT = {
+  certName: "", issuingOrg: "", description: "",
+  certFileName: "", certFileData: "", certFileError: "",
+};
+
+function CertificationsSection() {
+  const [records, setRecords]   = useState([]);
+  const [showForm, setShowForm] = useState(false);
+  const [editIdx, setEditIdx]   = useState(null);
+  const [draft, setDraft]       = useState({ ...EMPTY_CERT });
+  const certFileRef             = useRef(null);
+
+  const openAdd  = ()  => { setDraft({ ...EMPTY_CERT }); setEditIdx(null); setShowForm(true); };
+  const openEdit = (i) => { setDraft({ ...EMPTY_CERT, ...records[i], certFileError: "" }); setEditIdx(i); setShowForm(true); };
+  const cancel   = ()  => setShowForm(false);
+  const del      = (i) => setRecords(prev => prev.filter((_, idx) => idx !== i));
+
+  const reset = () => {
+    setDraft({ ...EMPTY_CERT });
+    if (certFileRef.current) certFileRef.current.value = "";
+  };
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const allowed = ["application/pdf", "image/png", "image/jpeg", "image/jpg"];
+    if (!allowed.includes(file.type)) {
+      setDraft(p => ({ ...p, certFileError: "Only PDF, PNG, JPG, or JPEG files are allowed.", certFileName: "", certFileData: "" }));
+      e.target.value = "";
+      return;
+    }
+    const MAX = 5 * 1024 * 1024;
+    if (file.size > MAX) {
+      setDraft(p => ({ ...p, certFileError: "File exceeds 5 MB. Please choose a smaller file.", certFileName: "", certFileData: "" }));
+      e.target.value = "";
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => setDraft(p => ({ ...p, certFileName: file.name, certFileData: ev.target.result, certFileError: "" }));
+    reader.readAsDataURL(file);
+  };
+
+  const removeFile = () => {
+    setDraft(p => ({ ...p, certFileName: "", certFileData: "", certFileError: "" }));
+    if (certFileRef.current) certFileRef.current.value = "";
+  };
+
+  const save = () => {
+    if (!draft.certName.trim() || !draft.issuingOrg.trim()) {
+      alert("Please fill in Certificate Name and Issuing Organization.");
+      return;
+    }
+    const { certFileError, ...toSave } = draft;
+    setRecords(prev =>
+      editIdx !== null
+        ? prev.map((r, i) => i === editIdx ? { ...toSave } : r)
+        : [...prev, { ...toSave }]
+    );
+    setShowForm(false);
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+
+      {/* ── RECORDS ── */}
+      {records.map((rec, i) => (
+        <div key={i} className="info-card" style={{
+          background: "#fff", border: "1px solid #e2e8f0", borderRadius: "16px",
+          overflow: "hidden", boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+        }}>
+          {/* Card header */}
+          <div style={{ background: BRAND_LIGHT, padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", flexWrap: "wrap" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", flex: 1, minWidth: 0 }}>
+              <div style={{ width: 38, height: 38, borderRadius: "10px", background: BRAND, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "17px", flexShrink: 0 }}>🏅</div>
+              <div style={{ minWidth: 0 }}>
+                <p style={{ fontWeight: 700, fontSize: "14px", color: "#1e293b", margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {rec.certName || "Untitled Certification"}
+                </p>
+                <p style={{ fontSize: "12px", color: "#475569", margin: "1px 0 0" }}>{rec.issuingOrg || "—"}</p>
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
+              <button onClick={() => openEdit(i)} style={{ ...btnOutline, padding: "5px 12px", fontSize: "12px" }}>✏️ Edit</button>
+              <button onClick={() => del(i)} style={btnDanger}>🗑 Delete</button>
+            </div>
+          </div>
+
+          {/* Card body */}
+          <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: "8px" }}>
+            {rec.description && <MetaRow icon="📝" label="Description" value={rec.description} />}
+            {rec.certFileName && rec.certFileData && (
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "2px" }}>
+                <span style={{ fontSize: "13px" }}>{rec.certFileName.toLowerCase().endsWith(".pdf") ? "📄" : "🖼️"}</span>
+                <span style={{ fontSize: "11px", fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em" }}>Certificate: </span>
+                <a href={rec.certFileData} download={rec.certFileName}
+                  style={{ fontSize: "12px", color: BRAND, fontWeight: 600, textDecoration: "underline", wordBreak: "break-all" }}>
+                  {rec.certFileName}
+                </a>
+              </div>
+            )}
+          </div>
+        </div>
+      ))}
+
+      {/* ── EMPTY STATE ── */}
+      {records.length === 0 && !showForm && (
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "12px", padding: "20px 0" }}>
+          <div style={{ fontSize: "36px", opacity: 0.25 }}>🏅</div>
+          <p style={{ fontSize: "13px", color: "#94a3b8", fontStyle: "italic", margin: 0 }}>No certifications added yet.</p>
+        </div>
+      )}
+
+      {/* ── FORM ── */}
+      {showForm && (
+        <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "16px", padding: "20px", display: "flex", flexDirection: "column", gap: "14px" }}>
+
+          {/* Form title */}
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", paddingBottom: "10px", borderBottom: "1px solid #e2e8f0" }}>
+            <div style={{ width: 30, height: 30, borderRadius: "8px", background: BRAND_LIGHT, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "15px" }}>🏅</div>
+            <p style={{ fontSize: "13px", fontWeight: 700, color: BRAND, textTransform: "uppercase", letterSpacing: "0.07em", margin: 0 }}>
+              {editIdx !== null ? "Edit Certification" : "Add Certification"}
+            </p>
+          </div>
+
+          {/* Fields */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+            <Field label="Certificate Name *">
+              <input type="text" value={draft.certName} placeholder="e.g. AWS Certified Solutions Architect"
+                onChange={e => setDraft(p => ({ ...p, certName: e.target.value }))} style={inputStyle} />
+            </Field>
+            <Field label="Issuing Organization *">
+              <input type="text" value={draft.issuingOrg} placeholder="e.g. Amazon Web Services"
+                onChange={e => setDraft(p => ({ ...p, issuingOrg: e.target.value }))} style={inputStyle} />
+            </Field>
+          </div>
+
+          <Field label="Description">
+            <textarea rows={3} value={draft.description} placeholder="Brief description of the certification..."
+              onChange={e => setDraft(p => ({ ...p, description: e.target.value }))}
+              style={{ ...inputStyle, resize: "none" }} />
+          </Field>
+
+          {/* File upload */}
+          <Field label="Certificate Upload (PDF, PNG, JPG, JPEG)">
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              {!draft.certFileData ? (
+                <div
+                  onClick={() => certFileRef.current && certFileRef.current.click()}
+                  style={{
+                    border: `2px dashed ${draft.certFileError ? "#fca5a5" : "#cbd5e1"}`,
+                    borderRadius: "12px", padding: "18px 16px",
+                    display: "flex", flexDirection: "column", alignItems: "center", gap: "6px",
+                    cursor: "pointer", background: draft.certFileError ? "#fff5f5" : "#fafafa",
+                    transition: "border-color 0.2s",
+                  }}>
+                  <span style={{ fontSize: "24px" }}>📁</span>
+                  <p style={{ fontSize: "12px", color: "#64748b", margin: 0, textAlign: "center" }}>
+                    Click to browse or drag &amp; drop<br />
+                    <span style={{ color: "#94a3b8", fontSize: "11px" }}>PDF, PNG, JPG, JPEG — max 5 MB</span>
+                  </p>
+                </div>
+              ) : (
+                <div style={{ display: "flex", alignItems: "center", gap: "10px", background: "#fff", border: "1px solid #e2e8f0", borderRadius: "12px", padding: "10px 14px" }}>
+                  <span style={{ fontSize: "22px", width: 44, height: 44, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "8px", background: BRAND_LIGHT, flexShrink: 0 }}>
+                    {draft.certFileName.toLowerCase().endsWith(".pdf") ? "📄" : "🖼️"}
+                  </span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: "13px", fontWeight: 600, color: "#1e293b", margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{draft.certFileName}</p>
+                    <p style={{ fontSize: "11px", color: "#94a3b8", margin: "2px 0 0" }}>Uploaded successfully</p>
+                  </div>
+                  <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
+                    <button onClick={() => certFileRef.current && certFileRef.current.click()} style={{ ...btnOutline, padding: "4px 10px", fontSize: "11px" }}>Replace</button>
+                    <button onClick={removeFile} style={{ ...btnDanger, padding: "4px 10px", fontSize: "11px" }}>Remove</button>
+                  </div>
+                </div>
+              )}
+              {draft.certFileError && (
+                <p style={{ fontSize: "12px", color: "#dc2626", margin: 0 }}>⚠️ {draft.certFileError}</p>
+              )}
+              <input ref={certFileRef} type="file" accept="application/pdf,image/png,image/jpeg,image/jpg"
+                onChange={handleFileUpload} style={{ display: "none" }} />
+            </div>
+          </Field>
+
+          {/* Actions */}
+          <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end", paddingTop: "4px" }}>
+            <button onClick={cancel} style={btnGhost}>Cancel</button>
+            <button onClick={reset}  style={btnOutline}>Reset</button>
+            <button onClick={save}   style={btnPrimary}>Save</button>
+          </div>
+        </div>
+      )}
+
+      {/* ── ADD BUTTON ── */}
+      {!showForm && (
+        <div>
+          <button onClick={openAdd} style={{ ...btnPrimary, padding: "10px 22px", fontSize: "14px", boxShadow: "0 6px 18px rgba(123,29,46,0.30)" }}>
+            + Add Certification
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─── MEMBERSHIP SECTION ─────────────────────────────── */
+const MEMBERSHIP_IN_OPTIONS = [
+  "",
+  "Professional Society / Association",
+  "Government Organization",
+  "International Organization",
+  "Private Company / Corporate",
+  "Research Institute",
+  "Conference Committee",
+  "Editorial Board",
+  "Academic Council",
+  "Other",
+];
+
+const EMPTY_MEMBERSHIP = {
+  membershipIn: "",
+  membershipId: "",
+  designation: "",
+  status: "",
+  fromDate: "",
+  description: "",
+  fileName: "",
+  fileData: "",
+  fileError: "",
+};
+
+function MembershipSection() {
+  const [records, setRecords]   = useState([]);
+  const [showForm, setShowForm] = useState(false);
+  const [editIdx, setEditIdx]   = useState(null);
+  const [draft, setDraft]       = useState({ ...EMPTY_MEMBERSHIP });
+  const fileRef                 = useRef(null);
+
+  const openAdd  = ()  => { setDraft({ ...EMPTY_MEMBERSHIP }); setEditIdx(null); setShowForm(true); };
+  const openEdit = (i) => { setDraft({ ...EMPTY_MEMBERSHIP, ...records[i], fileError: "" }); setEditIdx(i); setShowForm(true); };
+  const cancel   = ()  => setShowForm(false);
+  const del      = (i) => setRecords(prev => prev.filter((_, idx) => idx !== i));
+
+  const reset = () => {
+    setDraft({ ...EMPTY_MEMBERSHIP });
+    if (fileRef.current) fileRef.current.value = "";
+  };
+
+  const handleFile = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const allowed = ["application/pdf", "image/png", "image/jpeg", "image/jpg"];
+    if (!allowed.includes(file.type)) {
+      setDraft(p => ({ ...p, fileError: "Only PDF, PNG, JPG, or JPEG files are allowed.", fileName: "", fileData: "" }));
+      e.target.value = "";
+      return;
+    }
+    const MAX = 5 * 1024 * 1024;
+    if (file.size > MAX) {
+      setDraft(p => ({ ...p, fileError: "File exceeds 5 MB. Please choose a smaller file.", fileName: "", fileData: "" }));
+      e.target.value = "";
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => setDraft(p => ({ ...p, fileName: file.name, fileData: ev.target.result, fileError: "" }));
+    reader.readAsDataURL(file);
+  };
+
+  const removeFile = () => {
+    setDraft(p => ({ ...p, fileName: "", fileData: "", fileError: "" }));
+    if (fileRef.current) fileRef.current.value = "";
+  };
+
+  const save = () => {
+    const { fileError, ...toSave } = draft;
+    setRecords(prev =>
+      editIdx !== null
+        ? prev.map((r, i) => i === editIdx ? { ...toSave } : r)
+        : [...prev, { ...toSave }]
+    );
+    setShowForm(false);
+  };
+
+  const fmtDate = (d) => {
+    if (!d) return "—";
+    const dt = new Date(d);
+    if (isNaN(dt.getTime())) return d;
+    const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    return `${dt.getDate()} ${months[dt.getMonth()]} ${dt.getFullYear()}`;
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+
+      {/* ── RECORDS ── */}
+      {records.map((rec, i) => (
+        <div key={i} className="info-card" style={{
+          background: "#fff", border: "1px solid #e2e8f0", borderRadius: "16px",
+          overflow: "hidden", boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+        }}>
+          {/* Card header */}
+          <div style={{ background: BRAND_LIGHT, padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", flexWrap: "wrap" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", flex: 1, minWidth: 0 }}>
+              <div style={{ width: 38, height: 38, borderRadius: "10px", background: BRAND, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "17px", flexShrink: 0 }}>🪪</div>
+              <div style={{ minWidth: 0 }}>
+                <p style={{ fontWeight: 700, fontSize: "14px", color: "#1e293b", margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {rec.membershipIn || "—"}
+                </p>
+                <p style={{ fontSize: "12px", color: "#475569", margin: "1px 0 0" }}>{rec.designation || "—"}</p>
+              </div>
+              {rec.status && (
+                <span style={{
+                  fontSize: "11px", fontWeight: 600, padding: "3px 10px", borderRadius: "999px", flexShrink: 0,
+                  background: rec.status === "Active" ? "#dcfce7" : "#fee2e2",
+                  color:      rec.status === "Active" ? "#16a34a"  : "#dc2626",
+                  border:     `1px solid ${rec.status === "Active" ? "#bbf7d0" : "#fca5a5"}`,
+                }}>
+                  {rec.status}
+                </span>
+              )}
+            </div>
+            <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
+              <button type="button" onClick={() => openEdit(i)} style={{ ...btnOutline, padding: "5px 12px", fontSize: "12px" }}>✏️ Edit</button>
+              <button type="button" onClick={() => del(i)} style={btnDanger}>🗑 Delete</button>
+            </div>
+          </div>
+
+          {/* Card body */}
+          <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: "8px" }}>
+            {rec.membershipId && <MetaRow icon="🔖" label="Membership ID" value={rec.membershipId} />}
+            <MetaRow icon="📅" label="From Date" value={fmtDate(rec.fromDate)} />
+            {rec.description  && <MetaRow icon="📝" label="Description"  value={rec.description} />}
+            {rec.fileName && rec.fileData && (
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "2px" }}>
+                <span style={{ fontSize: "13px" }}>{rec.fileName.toLowerCase().endsWith(".pdf") ? "📄" : "🖼️"}</span>
+                <span style={{ fontSize: "11px", fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em" }}>Document: </span>
+                <a href={rec.fileData} download={rec.fileName}
+                  style={{ fontSize: "12px", color: BRAND, fontWeight: 600, textDecoration: "underline", wordBreak: "break-all" }}>
+                  {rec.fileName}
+                </a>
+              </div>
+            )}
+          </div>
+        </div>
+      ))}
+
+      {/* ── EMPTY STATE ── */}
+      {records.length === 0 && !showForm && (
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "12px", padding: "20px 0" }}>
+          <div style={{ fontSize: "36px", opacity: 0.25 }}>🪪</div>
+          <p style={{ fontSize: "13px", color: "#94a3b8", fontStyle: "italic", margin: 0 }}>No membership records added yet.</p>
+        </div>
+      )}
+
+      {/* ── FORM ── */}
+      {showForm && (
+        <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "16px", padding: "20px", display: "flex", flexDirection: "column", gap: "14px" }}>
+
+          {/* Form title */}
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", paddingBottom: "10px", borderBottom: "1px solid #e2e8f0" }}>
+            <div style={{ width: 30, height: 30, borderRadius: "8px", background: BRAND_LIGHT, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "15px" }}>🪪</div>
+            <p style={{ fontSize: "13px", fontWeight: 700, color: BRAND, textTransform: "uppercase", letterSpacing: "0.07em", margin: 0 }}>
+              {editIdx !== null ? "Edit Membership" : "Add Membership"}
+            </p>
+          </div>
+
+          {/* Membership In */}
+          <Field label="Membership In">
+            <select value={draft.membershipIn} onChange={e => setDraft(p => ({ ...p, membershipIn: e.target.value }))} style={inputStyle}>
+              {MEMBERSHIP_IN_OPTIONS.map(opt => (
+                <option key={opt} value={opt}>{opt === "" ? "Select Membership Type" : opt}</option>
+              ))}
+            </select>
+          </Field>
+
+          {/* Membership ID + Designation */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+            <Field label="Membership ID">
+              <input type="text" value={draft.membershipId} placeholder="e.g. MEM-2024-001"
+                onChange={e => setDraft(p => ({ ...p, membershipId: e.target.value }))} style={inputStyle} />
+            </Field>
+            <Field label="Designation">
+              <input type="text" value={draft.designation} placeholder="e.g. Senior Member"
+                onChange={e => setDraft(p => ({ ...p, designation: e.target.value }))} style={inputStyle} />
+            </Field>
+          </div>
+
+          {/* Status + From Date */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+            <Field label="Status">
+              <select value={draft.status} onChange={e => setDraft(p => ({ ...p, status: e.target.value }))} style={inputStyle}>
+                <option value="">Select Status</option>
+                <option value="Active">Active</option>
+                <option value="Inactive">Inactive</option>
+              </select>
+            </Field>
+            <Field label="From Date">
+              <input type="date" value={draft.fromDate}
+                onChange={e => setDraft(p => ({ ...p, fromDate: e.target.value }))} style={inputStyle} />
+            </Field>
+          </div>
+
+          {/* Description */}
+          <Field label="Description">
+            <textarea rows={3} value={draft.description} placeholder="Brief description of the membership..."
+              onChange={e => setDraft(p => ({ ...p, description: e.target.value }))}
+              style={{ ...inputStyle, resize: "none" }} />
+          </Field>
+
+          {/* File upload */}
+          <Field label="Upload Supporting File (PDF, PNG, JPG, JPEG)">
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              {!draft.fileData ? (
+                <div
+                  onClick={() => fileRef.current && fileRef.current.click()}
+                  style={{
+                    border: `2px dashed ${draft.fileError ? "#fca5a5" : "#cbd5e1"}`,
+                    borderRadius: "12px", padding: "18px 16px",
+                    display: "flex", flexDirection: "column", alignItems: "center", gap: "6px",
+                    cursor: "pointer", background: draft.fileError ? "#fff5f5" : "#fafafa",
+                    transition: "border-color 0.2s",
+                  }}>
+                  <span style={{ fontSize: "24px" }}>📁</span>
+                  <p style={{ fontSize: "12px", color: "#64748b", margin: 0, textAlign: "center" }}>
+                    Click to browse or drag &amp; drop<br />
+                    <span style={{ color: "#94a3b8", fontSize: "11px" }}>PDF, PNG, JPG, JPEG — max 5 MB</span>
+                  </p>
+                </div>
+              ) : (
+                <div style={{ display: "flex", alignItems: "center", gap: "10px", background: "#fff", border: "1px solid #e2e8f0", borderRadius: "12px", padding: "10px 14px" }}>
+                  <span style={{ fontSize: "22px", width: 44, height: 44, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "8px", background: BRAND_LIGHT, flexShrink: 0 }}>
+                    {draft.fileName.toLowerCase().endsWith(".pdf") ? "📄" : "🖼️"}
+                  </span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: "13px", fontWeight: 600, color: "#1e293b", margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{draft.fileName}</p>
+                    <p style={{ fontSize: "11px", color: "#94a3b8", margin: "2px 0 0" }}>Uploaded successfully</p>
+                  </div>
+                  <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
+                    <button type="button" onClick={() => fileRef.current && fileRef.current.click()} style={{ ...btnOutline, padding: "4px 10px", fontSize: "11px" }}>Replace</button>
+                    <button type="button" onClick={removeFile} style={{ ...btnDanger, padding: "4px 10px", fontSize: "11px" }}>Remove</button>
+                  </div>
+                </div>
+              )}
+              {draft.fileError && (
+                <p style={{ fontSize: "12px", color: "#dc2626", margin: 0 }}>⚠️ {draft.fileError}</p>
+              )}
+              <input ref={fileRef} type="file" accept="application/pdf,image/png,image/jpeg,image/jpg"
+                onChange={handleFile} style={{ display: "none" }} />
+            </div>
+          </Field>
+
+          {/* Actions */}
+          <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end", paddingTop: "4px" }}>
+            <button type="button" onClick={cancel} style={btnGhost}>Cancel</button>
+            <button type="button" onClick={reset}  style={btnOutline}>Reset</button>
+            <button type="button" onClick={save}   style={btnPrimary}>Save</button>
+          </div>
+        </div>
+      )}
+
+      {/* ── ADD BUTTON ── */}
+      {!showForm && (
+        <div>
+          <button type="button" onClick={openAdd} style={{ ...btnPrimary, padding: "10px 22px", fontSize: "14px", boxShadow: "0 6px 18px rgba(123,29,46,0.30)" }}>
+            + Add Membership
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ─── SECTION CONTENT ROUTER ─────────────────────────── */
 function SectionContent({ sectionId, sectionLabel }) {
   if (sectionId === "profile-summary")  return <ProfileSummarySection />;
+  if (sectionId === "education")        return <EducationSection />;
   if (sectionId === "languages")        return <LanguagesSection />;
   if (sectionId === "work-experience")  return <WorkExperienceSection />;
   if (sectionId === "technical-skills") return <TechnicalSkillsSection />;
   if (sectionId === "projects")         return <FundingProjectsSection />;
   if (sectionId === "patents")          return <PatentsSection />;
+  if (sectionId === "certifications")   return <CertificationsSection />;
+  if (sectionId === "membership")       return <MembershipSection />;
+  if (sectionId === "hobbies")          return <HobbiesSection />;
   return (
     <div style={{ textAlign: "center", padding: "24px 0", color: "#94a3b8", fontSize: "13px", fontStyle: "italic" }}>
       No information added yet.{" "}
